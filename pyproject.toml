@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "dirty-tag"
+
+[project]
+name = "sageworks-bridges"
+dynamic = ["version"]
+description = "SageWorks Bridges: End User Application Bridges to SageWorks/AWS"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = ["SageMaker", "Machine Learning", "AWS", "Python", "Utilities"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+authors = [{ name = "SuperCowPowers LLC", email = "support@supercowpowers.com" }]
+
+dependencies = [
+    "boto3 >= 1.28.76",
+    "botocore >= 1.31.76",
+    "awswrangler >= 3.4.0",
+    "sagemaker >= 2.143",
+    "requests >= 2.26.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/SuperCowPowers/sageworks-bridges"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = { find = { where = ["src"] } }
+
+[tool.check]
+dev-dependencies = [
+    "pytest",
+    "pytest-sugar",
+    "coverage",
+    "pytest-cov",
+    "flake8",
+    "black"
+]

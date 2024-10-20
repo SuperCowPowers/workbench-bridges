@@ -1,6 +1,11 @@
 # Sageworks Bridges
 End User Application Bridges to SageWorks/AWS ML Pipelines.
 
+## Installation
+```
+pip install sageworks-bridges
+```
+
 ## Examples
 Application invocation of an Endpoint on AWS.
 

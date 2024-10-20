@@ -9,7 +9,7 @@ from sagemaker.deserializers import CSVDeserializer
 from sagemaker import Predictor
 
 
-def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sagemaker_session = None) -> pd.DataFrame:
+def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sagemaker_session=None) -> pd.DataFrame:
     """Run inference on the Endpoint using the provided DataFrame
 
     Args:

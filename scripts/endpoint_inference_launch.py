@@ -1,15 +1,12 @@
-"""Launch an AWS Inference Run"""
-
 import os
 import sys
 import time
 import pandas as pd
 import logging
+import argparse
 
 # SageMaker-Bridges Imports
-from sageworks_bridges.aws.sagemaker_session import get_sagemaker_session
 from sageworks_bridges.endpoints.fast_inference import fast_inference
-
 
 # Set up logging
 log = logging.getLogger()
@@ -28,11 +25,40 @@ def download_data(endpoint_name: str):
     df.to_csv("test_evaluation_data.csv", index=False)
 
 
+def launch_inference(data: pd.DataFrame, endpoint_name: str):
+    """Launch inference on the provided data.
+
+    Args:
+        data (pd.DataFrame): Data for inference
+        endpoint_name (str): The name of the endpoint
+    """
+    num_rows = 1000
+
+    # Sample data for inference
+    data_sample = data.sample(n=num_rows, replace=True)
+    print(f"\nTiming Inference on {len(data_sample)} rows")
+
+    start_time = time.time()
+    results = fast_inference(endpoint_name, data_sample)
+    inference_time = time.time() - start_time
+
+    print(f"Inference Time: {inference_time} on Endpoint: {endpoint_name}")
+
+    # Print out the results
+    print("\nInference Results:")
+    print(results)
+
+
 if __name__ == "__main__":
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Launch an AWS Inference Run")
+    args = parser.parse_args()
 
     # Endpoint name to test
     test_endpoint_name = "test-timing-realtime"
-    num_rows = 1000
+
+    # Track total time
+    total_start_time = time.time()
 
     # Check if we have local data
     if not os.path.exists("test_evaluation_data.csv"):
@@ -40,20 +66,12 @@ if __name__ == "__main__":
         download_data(test_endpoint_name)
         sys.exit(1)
 
-    # Get out Sagemaker Session
-    sagemaker_session = get_sagemaker_session()
-
     # Local data this will duplicate a launch from an App like LiveDesign/StarDrop
     data = pd.read_csv("test_evaluation_data.csv")
 
-    # Run the inference on the Endpoint and print out the results
-    data_sample = data.sample(n=num_rows, replace=True)
-    print(f"\nTiming Inference on {len(data_sample)} rows")
-    start_time = time.time()
-    results = fast_inference(test_endpoint_name, data_sample, sagemaker_session)
-    inference_time = time.time() - start_time
-    print(f"Inference Time: {inference_time} on Endpoint: {test_endpoint_name}")
+    # Launch inference
+    launch_inference(data, test_endpoint_name)
 
-    # Print out the results
-    print("\nInference Results:")
-    print(results)
+    # Track total time
+    total_time = time.time() - total_start_time
+    print(f"Total Time: {total_time}")

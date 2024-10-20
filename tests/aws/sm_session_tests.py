@@ -17,3 +17,7 @@ def test_sm_session():
 
     for model in response["Models"]:
         print(model["ModelName"])
+
+
+if __name__ == "__main__":
+    test_sm_session()

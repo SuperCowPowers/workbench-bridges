@@ -39,12 +39,13 @@ Homepage = "https://github.com/SuperCowPowers/sageworks-bridges"
 package-dir = {"" = "src"}
 packages = { find = { where = ["src"] } }
 
-[tool.check]
-dev-dependencies = [
-    "pytest",
-    "pytest-sugar",
-    "coverage",
-    "pytest-cov",
-    "flake8",
-    "black"
-]
+[tool.flake8]
+max-line-length = 120
+extend-ignore = ["E203"]
+
+[tool.pytest.ini_options]
+addopts = "-v --cov-report term-missing"
+python_files = "*.py"
+python_functions = "test"
+norecursedirs = [".tox", ".git", "*.egg-info", "__pycache__", "dist", "build"]
+markers = ["long: marks tests as long (deselect with '-m \"not long\"')"]

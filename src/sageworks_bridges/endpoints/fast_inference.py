@@ -9,13 +9,13 @@ from sagemaker.deserializers import CSVDeserializer
 from sagemaker import Predictor
 
 
-def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session) -> pd.DataFrame:
+def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sagemaker_session) -> pd.DataFrame:
     """Run inference on the Endpoint using the provided DataFrame
 
     Args:
         endpoint_name (str): The name of the Endpoint
         eval_df (pd.DataFrame): The DataFrame to run predictions on
-        sm_session (sagemaker.session.Session): The SageMaker Session
+        sagemaker_session (sagemaker.session.Session): The SageMaker Session
 
     Returns:
         pd.DataFrame: The DataFrame with predictions
@@ -25,7 +25,7 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session) -> pd.
     """
     predictor = Predictor(
         endpoint_name,
-        sagemaker_session=sm_session,
+        sagemaker_session=sagemaker_session,
         serializer=CSVSerializer(),
         deserializer=CSVDeserializer(),
     )
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     print(my_train_df)
 
     # Run Fast Inference
-    sm_session = my_endpoint.sm_session
+    sagemaker_session = my_endpoint.sagemaker_session
     my_eval_df = fs_evaluation_data(my_endpoint)
-    my_results_df = fast_inference(my_endpoint_name, my_eval_df, sm_session)
+    my_results_df = fast_inference(my_endpoint_name, my_eval_df, sagemaker_session)
     print(my_results_df)

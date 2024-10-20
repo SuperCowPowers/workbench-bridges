@@ -5,11 +5,9 @@ import sys
 import time
 import pandas as pd
 import logging
-import boto3
-import sagemaker
 
 # SageMaker-Bridges Imports
-from sageworks_bridges.aws.sm_session import get_sagemaker_session
+from sageworks_bridges.aws.sagemaker_session import get_sagemaker_session
 from sageworks_bridges.endpoints.fast_inference import fast_inference
 
 
@@ -43,7 +41,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Get out Sagemaker Session
-    sm_session = get_sagemaker_session()
+    sagemaker_session = get_sagemaker_session()
 
     # Local data this will duplicate a launch from an App like LiveDesign/StarDrop
     data = pd.read_csv("test_evaluation_data.csv")
@@ -52,7 +50,7 @@ if __name__ == "__main__":
     data_sample = data.sample(n=num_rows, replace=True)
     print(f"\nTiming Inference on {len(data_sample)} rows")
     start_time = time.time()
-    results = fast_inference(test_endpoint_name, data_sample, sm_session)
+    results = fast_inference(test_endpoint_name, data_sample, sagemaker_session)
     inference_time = time.time() - start_time
     print(f"Inference Time: {inference_time} on Endpoint: {test_endpoint_name}")
 

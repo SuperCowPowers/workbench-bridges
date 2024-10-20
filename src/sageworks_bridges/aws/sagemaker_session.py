@@ -24,11 +24,11 @@ def get_sagemaker_session() -> sagemaker.Session:
 if __name__ == "__main__":
 
     # Get SageMaker Session
-    sm_session = get_sagemaker_session()
+    sagemaker_session = get_sagemaker_session()
 
     # List SageMaker Models
     print("\nSageMaker Models:")
-    sagemaker_client = sm_session.sagemaker_client
+    sagemaker_client = sagemaker_session.sagemaker_client
     response = sagemaker_client.list_models()
 
     for model in response["Models"]:

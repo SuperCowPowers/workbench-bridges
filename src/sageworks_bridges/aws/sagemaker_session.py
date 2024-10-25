@@ -12,18 +12,22 @@ def get_sagemaker_session() -> sagemaker.Session:
     role = "SageWorks-ExecutionRole"
     account_id = session.boto_session.client("sts").get_caller_identity()["Account"]
 
-    # Assume the SageWorks execution role
-    assumed_role = boto3.client("sts").assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}", RoleSessionName="SageWorksSession"
-    )
+    try:
+        # Attempt to assume the SageWorks execution role
+        assumed_role = boto3.client("sts").assume_role(
+            RoleArn=f"arn:aws:iam::{account_id}:role/{role}", RoleSessionName="SageWorksSession"
+        )
 
-    # Update the boto session in SageMaker session with assumed role credentials
-    credentials = assumed_role["Credentials"]
-    session.boto_session = boto3.Session(
-        aws_access_key_id=credentials["AccessKeyId"],
-        aws_secret_access_key=credentials["SecretAccessKey"],
-        aws_session_token=credentials["SessionToken"],
-    )
+        # Update the boto session in SageMaker session with assumed role credentials
+        credentials = assumed_role["Credentials"]
+        session.boto_session = boto3.Session(
+            aws_access_key_id=credentials["AccessKeyId"],
+            aws_secret_access_key=credentials["SecretAccessKey"],
+            aws_session_token=credentials["SessionToken"],
+        )
+    except Exception as e:
+        # Log the failure and proceed with the default session
+        print(f"Warning: Failed to assume SageWorks role. Using default session. Error: {e}")
 
     return session
 
@@ -41,7 +45,7 @@ if __name__ == "__main__":
     for model in response["Models"]:
         print(model["ModelName"])
 
-    # Get the boto3 session and list S3 bucket
+    # Get the boto3 session and list S3 buckets
     boto3_session = sagemaker_session.boto_session
     s3_client = boto3_session.client("s3")
     response = s3_client.list_buckets()

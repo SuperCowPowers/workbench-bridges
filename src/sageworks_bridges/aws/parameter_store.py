@@ -110,7 +110,8 @@ class ParameterStore:
             if value.startswith("COMPRESSED:"):
                 # Base64 decode and decompress
                 self.log.important(f"Decompressing parameter '{name}'...")
-                compressed_value = base64.b64decode(value[len("COMPRESSED:") :])
+                comp_flag_length = len("COMPRESSED:")
+                compressed_value = base64.b64decode(value[comp_flag_length:])
                 value = zlib.decompress(compressed_value).decode("utf-8")
 
             # Attempt to parse the value back to its original type

@@ -14,16 +14,15 @@ def get_sagemaker_session() -> sagemaker.Session:
 
     # Assume the SageWorks execution role
     assumed_role = boto3.client("sts").assume_role(
-        RoleArn=f'arn:aws:iam::{account_id}:role/{role}',
-        RoleSessionName="SageWorksSession"
+        RoleArn=f"arn:aws:iam::{account_id}:role/{role}", RoleSessionName="SageWorksSession"
     )
 
     # Update the boto session in SageMaker session with assumed role credentials
-    credentials = assumed_role['Credentials']
+    credentials = assumed_role["Credentials"]
     session.boto_session = boto3.Session(
-        aws_access_key_id=credentials['AccessKeyId'],
-        aws_secret_access_key=credentials['SecretAccessKey'],
-        aws_session_token=credentials['SessionToken']
+        aws_access_key_id=credentials["AccessKeyId"],
+        aws_secret_access_key=credentials["SecretAccessKey"],
+        aws_session_token=credentials["SessionToken"],
     )
 
     return session

@@ -5,17 +5,25 @@ import sagemaker
 
 
 def get_sagemaker_session() -> sagemaker.Session:
-
-    # Create a SageMaker session
+    # Create initial SageMaker session
     session = sagemaker.Session()
 
-    # Get the SageMaker role
+    # Specify the SageWorks execution role
     role = "SageWorks-ExecutionRole"
+    account_id = session.boto_session.client("sts").get_caller_identity()["Account"]
 
-    # Attach the role to the session
-    boto3.client("sts").assume_role(
-        RoleArn=f'arn:aws:iam::{session.boto_session.client("sts").get_caller_identity()["Account"]}:role/{role}',
-        RoleSessionName="SageWorksSession",
+    # Assume the SageWorks execution role
+    assumed_role = boto3.client("sts").assume_role(
+        RoleArn=f'arn:aws:iam::{account_id}:role/{role}',
+        RoleSessionName="SageWorksSession"
+    )
+
+    # Update the boto session in SageMaker session with assumed role credentials
+    credentials = assumed_role['Credentials']
+    session.boto_session = boto3.Session(
+        aws_access_key_id=credentials['AccessKeyId'],
+        aws_secret_access_key=credentials['SecretAccessKey'],
+        aws_session_token=credentials['SessionToken']
     )
 
     return session
@@ -33,3 +41,12 @@ if __name__ == "__main__":
 
     for model in response["Models"]:
         print(model["ModelName"])
+
+    # Get the boto3 session and list S3 bucket
+    boto3_session = sagemaker_session.boto_session
+    s3_client = boto3_session.client("s3")
+    response = s3_client.list_buckets()
+    if "Buckets" in response:
+        print("\nS3 Buckets:")
+        for bucket in response["Buckets"]:
+            print(bucket["Name"])

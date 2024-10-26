@@ -158,9 +158,9 @@ class ParameterStore:
                     self.log.error(f"For larger data use the DFStore() class ({doc_link})")
                     return
 
-                # Add or update the compressed parameter in Parameter Store
+                # Insert or update the compressed parameter in Parameter Store
                 try:
-                    # Add or update the compressed parameter in Parameter Store
+                    # Insert or update the compressed parameter in Parameter Store
                     self.ssm_client.put_parameter(Name=name, Value=encoded_value, Type="String", Overwrite=overwrite)
                     self.log.info(f"Parameter '{name}' added/updated successfully with compression.")
                     return
@@ -168,7 +168,7 @@ class ParameterStore:
                     self.log.critical(f"Failed to add/update compressed parameter '{name}': {e}")
                     raise
 
-            # Add or update the parameter normally if under 4KB
+            # Insert or update the parameter normally if under 4KB
             self.ssm_client.put_parameter(Name=name, Value=value, Type="String", Overwrite=overwrite)
             self.log.info(f"Parameter '{name}' added/updated successfully.")
 

@@ -47,7 +47,7 @@ class ParameterStore:
 
     def __init__(self):
         """ParameterStore Init Method"""
-        self.log = logging.getLogger("sageworks")
+        self.log = logging.getLogger("sageworks-bridges")
 
         # Initialize a SageWorks Session (to assume the SageWorks ExecutionRole)
         self.boto3_session = get_sagemaker_session().boto_session

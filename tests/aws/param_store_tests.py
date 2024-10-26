@@ -6,7 +6,7 @@ import logging
 from sageworks_bridges.aws.parameter_store import ParameterStore
 
 # Show debug calls
-logging.getLogger("sageworks").setLevel(logging.DEBUG)
+logging.getLogger("sageworks-bridges").setLevel(logging.DEBUG)
 
 
 def test_listing_values():

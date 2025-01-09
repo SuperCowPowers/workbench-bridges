@@ -2,8 +2,8 @@ import os
 import sys
 import pandas as pd
 
-# SageWorks-Bridges Imports
-from sageworks_bridges.endpoints.fast_inference import fast_inference
+# Workbench-Bridges Imports
+from workbench_bridges.endpoints.fast_inference import fast_inference
 
 
 if __name__ == "__main__":

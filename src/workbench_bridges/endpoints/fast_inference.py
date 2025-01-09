@@ -44,8 +44,8 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sagemaker_session=
 
 if __name__ == "__main__":
     """Exercise the Endpoint Utilities"""
-    from sageworks.api.endpoint import Endpoint
-    from sageworks.utils.endpoint_utils import fs_training_data, fs_evaluation_data
+    from workbench.api.endpoint import Endpoint
+    from workbench.utils.endpoint_utils import fs_training_data, fs_evaluation_data
 
     # Create an Endpoint
     my_endpoint_name = "abalone-regression-end"

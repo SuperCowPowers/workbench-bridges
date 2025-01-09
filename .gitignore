@@ -143,8 +143,8 @@ cdk.context.json
 # CDK Output files
 cdk.out/
 
-# SageWorks Lambda Layer Output files
-sageworks_lambda_layer_output/
+# Workbench Lambda Layer Output files
+workbench_lambda_layer_output/
 
 # Some test datasets
 test_evaluation_data.csv

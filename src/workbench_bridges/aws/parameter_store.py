@@ -1,4 +1,4 @@
-"""ParameterStore: Manages SageWorks parameters in AWS Systems Manager Parameter Store."""
+"""ParameterStore: Manages Workbench parameters in AWS Systems Manager Parameter Store."""
 
 from typing import Union
 import logging
@@ -7,12 +7,12 @@ import zlib
 import base64
 from botocore.exceptions import ClientError
 
-# SageWorks-Bridges Imports
-from sageworks_bridges.aws.sagemaker_session import get_sagemaker_session
+# Workbench-Bridges Imports
+from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
 
 
 class ParameterStore:
-    """ParameterStore: Manages SageWorks parameters in AWS Systems Manager Parameter Store.
+    """ParameterStore: Manages Workbench parameters in AWS Systems Manager Parameter Store.
 
     Common Usage:
         ```python
@@ -21,10 +21,10 @@ class ParameterStore:
         # List Parameters
         params.list()
 
-        ['/sageworks/abalone_info',
-         '/sageworks/my_data',
-         '/sageworks/test',
-         '/sageworks/pipelines/my_pipeline']
+        ['/workbench/abalone_info',
+         '/workbench/my_data',
+         '/workbench/test',
+         '/workbench/pipelines/my_pipeline']
 
         # Add Key
         params.add("key", "value")
@@ -47,9 +47,9 @@ class ParameterStore:
 
     def __init__(self):
         """ParameterStore Init Method"""
-        self.log = logging.getLogger("sageworks-bridges")
+        self.log = logging.getLogger("workbench-bridges")
 
-        # Initialize a SageWorks Session (to assume the SageWorks ExecutionRole)
+        # Initialize a Workbench Session (to assume the Workbench ExecutionRole)
         self.boto3_session = get_sagemaker_session().boto_session
 
         # Create a Systems Manager (SSM) client for Parameter Store operations
@@ -153,7 +153,7 @@ class ParameterStore:
                 # Report on the size of the compressed value
                 compressed_size = len(compressed_value)
                 if compressed_size > 4096:
-                    doc_link = "https://supercowpowers.github.io/sageworks/api_classes/df_store"
+                    doc_link = "https://supercowpowers.github.io/workbench/api_classes/df_store"
                     self.log.error(f"Compressed size {compressed_size} bytes, cannot store > 4KB")
                     self.log.error(f"For larger data use the DFStore() class ({doc_link})")
                     return
@@ -205,22 +205,22 @@ if __name__ == "__main__":
     print(param_store.list())
 
     # Add a new parameter
-    param_store.set("/sageworks/test", "value", overwrite=True)
+    param_store.set("/workbench/test", "value", overwrite=True)
 
     # Get the parameter
-    print(f"Getting parameter 'test': {param_store.get('/sageworks/test')}")
+    print(f"Getting parameter 'test': {param_store.get('/workbench/test')}")
 
     # Add a dictionary as a parameter
     sample_dict = {"key": "str_value", "awesome_value": 4.2}
-    param_store.set("/sageworks/my_data", sample_dict, overwrite=True)
+    param_store.set("/workbench/my_data", sample_dict, overwrite=True)
 
     # Retrieve the parameter as a dictionary
-    retrieved_value = param_store.get("/sageworks/my_data")
+    retrieved_value = param_store.get("/workbench/my_data")
     print("Retrieved value:", retrieved_value)
 
     # Delete the parameters
-    param_store.delete("/sageworks/test")
-    param_store.delete("/sageworks/my_data")
+    param_store.delete("/workbench/test")
+    param_store.delete("/workbench/my_data")
 
     # Out of scope tests
     param_store.set("test", "value")

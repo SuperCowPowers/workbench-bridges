@@ -2,8 +2,8 @@
 
 import pandas as pd
 
-# SageWorks-Bridges Imports
-from sageworks_bridges.aws.df_store import DFStore
+# Workbench-Bridges Imports
+from workbench_bridges.aws.df_store import DFStore
 
 # Create a DFStore object
 df_store = DFStore()

@@ -1,2 +1,2 @@
-# sageworks-bridges
-End User Application Bridges to SageWorks/AWS
+# workbench-bridges
+End User Application Bridges to Workbench/AWS

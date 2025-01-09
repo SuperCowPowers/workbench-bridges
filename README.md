@@ -1,9 +1,9 @@
-# Sageworks Bridges
-End User Application Bridges to SageWorks/AWS ML Pipelines.
+# Workbench Bridges
+End User Application Bridges to Workbench/AWS ML Pipelines.
 
 ## Installation
 ```
-pip install sageworks-bridges
+pip install workbench-bridges
 ```
 
 ## Examples
@@ -12,8 +12,8 @@ Application invocation of an Endpoint on AWS.
 ```
 import pandas as pd
 
-# SageWorks-Bridges Imports
-from sageworks_bridges.endpoints.fast_inference import fast_inference
+# Workbench-Bridges Imports
+from workbench_bridges.endpoints.fast_inference import fast_inference
 
 
 if __name__ == "__main__":

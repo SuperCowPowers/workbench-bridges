@@ -1,7 +1,7 @@
 # Copyright (c) 2021-2024 SuperCowPowers LLC
 
 """
-SageWorks Bridges
+Workbench Bridges
 - TBD
   - TBD1
   - TBD2
@@ -9,11 +9,11 @@ SageWorks Bridges
 from importlib.metadata import version
 
 try:
-    __version__ = version("sageworks_bridges")
+    __version__ = version("workbench_bridges")
 except Exception:
     __version__ = "unknown"
 
-# SageWorks Bridges Logging
-from sageworks_bridges.utils.logger import logging_setup
+# Workbench Bridges Logging
+from workbench_bridges.utils.logger import logging_setup
 
 logging_setup()

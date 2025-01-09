@@ -34,7 +34,7 @@ clean-misc:
 	find . -name '.ipynb_checkpoints' -exec rm -rf {} +
 
 lint:
-	flake8 src/sageworks tests
+	flake8 src/workbench tests
 
 test:
 	tox

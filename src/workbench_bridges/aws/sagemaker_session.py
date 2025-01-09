@@ -8,14 +8,14 @@ def get_sagemaker_session() -> sagemaker.Session:
     # Create initial SageMaker session
     session = sagemaker.Session()
 
-    # Specify the SageWorks execution role
-    role = "SageWorks-ExecutionRole"
+    # Specify the Workbench execution role
+    role = "Workbench-ExecutionRole"
     account_id = session.boto_session.client("sts").get_caller_identity()["Account"]
 
     try:
-        # Attempt to assume the SageWorks execution role
+        # Attempt to assume the Workbench execution role
         assumed_role = boto3.client("sts").assume_role(
-            RoleArn=f"arn:aws:iam::{account_id}:role/{role}", RoleSessionName="SageWorksSession"
+            RoleArn=f"arn:aws:iam::{account_id}:role/{role}", RoleSessionName="WorkbenchSession"
         )
 
         # Update the boto session in SageMaker session with assumed role credentials
@@ -27,7 +27,7 @@ def get_sagemaker_session() -> sagemaker.Session:
         )
     except Exception as e:
         # Log the failure and proceed with the default session
-        print(f"Warning: Failed to assume SageWorks role. Using default session. Error: {e}")
+        print(f"Warning: Failed to assume Workbench role. Using default session. Error: {e}")
 
     return session
 

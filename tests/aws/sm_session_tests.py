@@ -1,7 +1,7 @@
 """Tests for the AWS Account Stuff"""
 
-# SageWorks-Bridge Imports
-from sageworks_bridges.aws.sagemaker_session import get_sagemaker_session
+# Workbench-Bridge Imports
+from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
 
 
 def test_sagemaker_session():

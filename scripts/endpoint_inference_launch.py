@@ -6,19 +6,19 @@ import logging
 import argparse
 
 # SageMaker-Bridges Imports
-from sageworks_bridges.endpoints.fast_inference import fast_inference
+from workbench_bridges.endpoints.fast_inference import fast_inference
 
 # Set up logging
 log = logging.getLogger()
 
 
 def download_data(endpoint_name: str):
-    """Download the data SageWorks FeatureSet
+    """Download the data Workbench FeatureSet
 
     Args:
         endpoint_name (str): The name of the Endpoint
     """
-    from sageworks.api import FeatureSet, Model, Endpoint
+    from workbench.api import FeatureSet, Model, Endpoint
 
     fs = FeatureSet(Model(Endpoint(endpoint_name).get_input()).get_input())
     df = fs.pull_dataframe()

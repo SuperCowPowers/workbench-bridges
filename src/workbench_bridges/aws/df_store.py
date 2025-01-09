@@ -6,9 +6,9 @@ import awswrangler as wr
 import pandas as pd
 from botocore.exceptions import ClientError
 
-# SageWorks Bridges Imports
-from sageworks_bridges.aws.sagemaker_session import get_sagemaker_session
-from sageworks_bridges.aws.parameter_store import ParameterStore
+# Workbench Bridges Imports
+from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
+from workbench_bridges.aws.parameter_store import ParameterStore
 
 
 class DFStore:
@@ -40,16 +40,16 @@ class DFStore:
         Args:
             s3_df_bucket (str): The S3 Bucket to use for dataframe storage (optional)
         """
-        self.log = logging.getLogger("sageworks-bridges")
+        self.log = logging.getLogger("workbench-bridges")
         self.prefix = "df_store/"
 
         # Set the S3 bucket or retrieve it from Parameter Store
-        param_key = "/sageworks/config/sageworks_bucket"
+        param_key = "/workbench/config/workbench_bucket"
         self.df_bucket = s3_df_bucket or ParameterStore().get(param_key)
         if self.df_bucket is None:
             raise ValueError(f"Either specify S3 Bucket or set '{param_key}' in Parameter Store.")
 
-        # Grab a SageWorks Session (this allows us to assume the SageWorks ExecutionRole)
+        # Grab a Workbench Session (this allows us to assume the Workbench ExecutionRole)
         self.boto3_session = get_sagemaker_session().boto_session
 
         # Read all the Pipelines from this S3 path

@@ -45,21 +45,21 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sagemaker_session=
 if __name__ == "__main__":
     """Exercise the Endpoint Utilities"""
     from workbench.api.endpoint import Endpoint
-    from workbench.utils.endpoint_utils import fs_training_data, fs_evaluation_data
+    from workbench.utils.endpoint_utils import fs_evaluation_data
 
-    # Create an Endpoint
+    # Grab the Endpoint
     my_endpoint_name = "abalone-regression-end"
     my_endpoint = Endpoint(my_endpoint_name)
     if not my_endpoint.exists():
         print(f"Endpoint {my_endpoint_name} does not exist.")
         exit(1)
 
-    # Get the training data
-    my_train_df = fs_training_data(my_endpoint)
-    print(my_train_df)
+    # Pull evaluation data
+    print("Pulling Evaluation Data...")
+    sagemaker_session = my_endpoint.sm_session
+    my_eval_df = fs_evaluation_data(my_endpoint)
 
     # Run Fast Inference
-    sagemaker_session = my_endpoint.sagemaker_session
-    my_eval_df = fs_evaluation_data(my_endpoint)
+    print("Starting Fast Inference...")
     my_results_df = fast_inference(my_endpoint_name, my_eval_df, sagemaker_session)
     print(my_results_df)

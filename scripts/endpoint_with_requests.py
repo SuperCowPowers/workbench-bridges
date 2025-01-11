@@ -4,11 +4,16 @@ from requests_aws4auth import AWS4Auth
 import pandas as pd
 from io import StringIO
 
+profile="workbench_role"
+
+# Define the region/endpoint
+region = "us-west-2"
+endpoint_name = "abalone-regression-end"
 
 def invoke_endpoint_csv(endpoint_name: str, region: str, eval_df: pd.DataFrame) -> pd.DataFrame:
     """Invoke SageMaker endpoint with CSV input and return predictions as CSV."""
     # Fetch AWS credentials
-    session = boto3.Session(profile_name="workbench_role")
+    session = boto3.Session(profile_name=profile)
     credentials = session.get_credentials().get_frozen_credentials()
     auth = AWS4Auth(
         credentials.access_key,
@@ -40,7 +45,7 @@ def invoke_endpoint_csv(endpoint_name: str, region: str, eval_df: pd.DataFrame) 
 def invoke_endpoint_json(endpoint_name: str, region: str, eval_df: pd.DataFrame) -> pd.DataFrame:
     """Invoke SageMaker endpoint with JSON input and return predictions as JSON."""
     # Fetch AWS credentials
-    session = boto3.Session(profile_name="workbench_role")
+    session = boto3.Session(profile_name=profile)
     credentials = session.get_credentials().get_frozen_credentials()
     auth = AWS4Auth(
         credentials.access_key,
@@ -74,9 +79,6 @@ if __name__ == "__main__":
     from workbench.api.endpoint import Endpoint
     from workbench.utils.endpoint_utils import fs_evaluation_data
 
-    # Define the region/endpoint
-    region = "us-west-2"
-    endpoint_name = "abalone-regression-end"
     endpoint = Endpoint(endpoint_name)
     if not endpoint.exists():
         raise ValueError(f"Endpoint {endpoint_name} does not exist.")

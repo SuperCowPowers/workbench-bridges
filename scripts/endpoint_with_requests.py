@@ -4,11 +4,12 @@ from requests_aws4auth import AWS4Auth
 import pandas as pd
 from io import StringIO
 
-profile="workbench_role"
+profile = "workbench_role"
 
 # Define the region/endpoint
 region = "us-west-2"
 endpoint_name = "abalone-regression-end"
+
 
 def invoke_endpoint_csv(endpoint_name: str, region: str, eval_df: pd.DataFrame) -> pd.DataFrame:
     """Invoke SageMaker endpoint with CSV input and return predictions as CSV."""

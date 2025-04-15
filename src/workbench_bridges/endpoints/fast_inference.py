@@ -85,7 +85,7 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
         chunk_size = 100
 
     # Split DataFrame into chunks and process them concurrently
-    chunks = [(eval_df[i : i + chunk_size], i) for i in range(0, total_rows, chunk_size)]
+    chunks = [(eval_df[i : i + chunk_size], i) for i in range(0, total_rows, chunk_size)]  # noqa: E203
     with ThreadPoolExecutor(max_workers=threads) as executor:
         df_list = list(executor.map(lambda p: process_chunk(*p), chunks))
 

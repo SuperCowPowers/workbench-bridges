@@ -19,10 +19,10 @@ from workbench_bridges.endpoints.fast_inference import fast_inference
 if __name__ == "__main__":
 
     # Data will be passed in from the End-User Application
-    eval_df = pd.read_csv("test_evaluation_data.csv")[:1000]
+    eval_df = pd.read_csv("test_evaluation_data.csv")
 
     # Run inference on AWS Endpoint
-    endpoint_name = "test-timing-realtime"
+    endpoint_name = "test-my-endpoint"
     results = fast_inference(endpoint_name, eval_df)
 
     # A Dataframe with Predictions is returned

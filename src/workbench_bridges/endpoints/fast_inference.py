@@ -68,7 +68,11 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
         log.info(f"Processing {start_index}:{min(start_index + chunk_size, total_rows)} out of {total_rows} rows...")
         csv_buffer = StringIO()
         chunk_df.to_csv(csv_buffer, index=False)
-        response = predictor.predict(csv_buffer.getvalue())
+        try:
+            response = predictor.predict(csv_buffer.getvalue())
+        except Exception as e:
+            log.error(f"Error during prediction: {e}")
+            return pd.DataFrame()
         # CSVDeserializer returns a nested list: first row is headers
         return pd.DataFrame.from_records(response[1:], columns=response[0])
 

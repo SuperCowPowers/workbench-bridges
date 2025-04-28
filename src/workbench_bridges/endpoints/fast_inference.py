@@ -64,6 +64,9 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
 
     total_rows = len(eval_df)
 
+    # Fixed chunk size of 100 rows
+    chunk_size = 100
+
     def process_chunk(chunk_df: pd.DataFrame, start_index: int) -> pd.DataFrame:
         log.info(f"Processing {start_index}:{min(start_index + chunk_size, total_rows)} out of {total_rows} rows...")
         csv_buffer = StringIO()
@@ -81,17 +84,20 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
         log.warning("Sagemaker has a connection pool limit of 10. Reducing threads to 10.")
         threads = 10
 
-    # Compute the chunk size (divide number of threads)
-    chunk_size = max(1, total_rows // threads)
-
-    # We also need to ensure that the chunk size is not too big
-    if chunk_size > 100:
-        chunk_size = 100
-
     # Split DataFrame into chunks and process them concurrently
-    chunks = [(eval_df[i : i + chunk_size], i) for i in range(0, total_rows, chunk_size)]  # noqa: E203
-    with ThreadPoolExecutor(max_workers=threads) as executor:
+    chunks = [(eval_df[i: i + chunk_size], i) for i in range(0, total_rows, chunk_size)]  # noqa: E203
+
+    # Use min of threads or number of chunks to avoid creating unnecessary threads
+    actual_threads = min(threads, len(chunks))
+    with ThreadPoolExecutor(max_workers=actual_threads) as executor:
         df_list = list(executor.map(lambda p: process_chunk(*p), chunks))
+
+    # Filter out empty DataFrames that might result from errors
+    df_list = [df for df in df_list if not df.empty]
+
+    if not df_list:
+        log.error("All prediction chunks failed")
+        return pd.DataFrame()
 
     combined_df = pd.concat(df_list, ignore_index=True)
 

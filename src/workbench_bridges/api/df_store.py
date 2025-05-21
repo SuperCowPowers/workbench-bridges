@@ -8,7 +8,7 @@ from botocore.exceptions import ClientError
 
 # Workbench Bridges Imports
 from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
-from workbench_bridges.aws.parameter_store import ParameterStore
+from workbench_bridges.api.parameter_store import ParameterStore
 
 
 class DFStore:

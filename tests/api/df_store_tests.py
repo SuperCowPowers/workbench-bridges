@@ -3,7 +3,7 @@
 import pandas as pd
 
 # Workbench-Bridges Imports
-from workbench_bridges.aws.df_store import DFStore
+from workbench_bridges.api.df_store import DFStore
 
 # Create a DFStore object
 df_store = DFStore()

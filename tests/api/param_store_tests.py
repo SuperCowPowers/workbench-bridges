@@ -3,7 +3,7 @@
 import logging
 
 # Workbench-Bridges Imports
-from workbench_bridges.aws.parameter_store import ParameterStore
+from workbench_bridges.api.parameter_store import ParameterStore
 
 # Show debug calls
 logging.getLogger("workbench-bridges").setLevel(logging.DEBUG)

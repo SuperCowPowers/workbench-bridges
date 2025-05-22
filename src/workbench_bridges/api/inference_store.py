@@ -1,6 +1,7 @@
 """InferenceStore: Manage Inference Results using AWS S3/Parquet/Snappy with Athena Queries"""
 
 import logging
+import time
 import pandas as pd
 import awswrangler as wr
 
@@ -24,7 +25,7 @@ class InferenceStore:
         ```
     """
 
-    def __init__(self, catalog_db: str = "inference_store", table_name: str = "inference_results"):
+    def __init__(self, catalog_db: str = "inference_store", table_name: str = "inference_store"):
         """Initialize InferenceStore with S3 path and auto-register Glue/Athena table"""
         self.log = logging.getLogger("workbench-bridges")
         self.catalog_db = catalog_db
@@ -56,32 +57,14 @@ class InferenceStore:
             int: The total number of rows in the Inference Store.
         """
         self.log.info(f"Retrieving total rows from {self.catalog_db}.{self.table_name}")
-        try:
-            df = wr.athena.read_sql_query(
-                sql=f'SELECT COUNT(*) FROM "{self.catalog_db}"."{self.table_name}"',
-                database=self.catalog_db,
-                ctas_approach=False,
-                boto3_session=self.boto3_session,
-            )
-            return df.iloc[0, 0]
-        except Exception as e:
-            self.log.error(f"Failed to retrieve total rows: {e}")
-            return 0
+        df = self.query(f"SELECT COUNT(*) FROM {self.table_name}")
+        return df.iloc[0, 0]
 
     def query(self, athena_query: str) -> pd.DataFrame:
-        """Run a query against the Inference Store
-
-        Args:
-            athena_query (str): The Athena SQL query to run.
-
-        Returns:
-            pd.DataFrame: The result of the query as a DataFrame.
-        """
-
-        # If the query doesn't have a from/FROM clause, add it
-        if "from" not in athena_query.lower():
-            athena_query += "FROM {self.catalog_db}.{self.table_name}"
+        """Run a query against the Inference Store"""
         self.log.info(f"Running query: {athena_query}")
+        start_time = time.time()
+
         try:
             df = wr.athena.read_sql_query(
                 sql=athena_query,
@@ -89,6 +72,8 @@ class InferenceStore:
                 ctas_approach=False,
                 boto3_session=self.boto3_session,
             )
+            execution_time = time.time() - start_time
+            self.log.info(f"Query completed in {execution_time:.2f} seconds")
             return df
         except Exception as e:
             self.log.error(f"Failed to run query: {e}")
@@ -113,6 +98,7 @@ if __name__ == "__main__":
     # Create a DataFrame
     df = pd.DataFrame(
         {
+            "compound_id": [1, 2, 3],
             "model_name": ["model1", "model2", "model3"],
             "inference_result": [0.1, 0.2, 0.3],
             "timestamp": pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"]),
@@ -124,8 +110,15 @@ if __name__ == "__main__":
 
     # List the total rows
     print(f"Total rows in Inference Store: {inf_store.total_rows()}")
+
+    # List all models
     print("Listing Models...")
-    print(inf_store.query("SELECT distinct model_name FROM inference_store.inference_results"))
+    print(inf_store.query("SELECT distinct model_name FROM inference_store"))
+
+    # Run a custom query
+    print("Running custom query...")
+    custom_query = "SELECT * FROM inference_store WHERE compound_id = 1"
+    print(inf_store.query(custom_query))
 
     # Delete all data
-    inf_store.delete_all_data()
+    # inf_store.delete_all_data()

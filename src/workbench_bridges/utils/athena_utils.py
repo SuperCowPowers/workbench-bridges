@@ -142,5 +142,5 @@ if __name__ == "__main__":
     print(list(wr.catalog.get_tables(database=my_catalog_db, boto3_session=my_boto3_session)))
 
     # Delete the table
-    # delete_table("test_table", my_catalog_db)
-    # print(f"Table 'test_table' deleted from database '{my_catalog_db}'.")
+    delete_table("test_table", my_catalog_db)
+    print(f"Table 'test_table' deleted from database '{my_catalog_db}'.")

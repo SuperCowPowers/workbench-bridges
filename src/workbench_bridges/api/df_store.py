@@ -1,14 +1,17 @@
 """DFStore: Fast/efficient storage of DataFrames using AWS S3/Parquet/Snappy"""
 
+from datetime import datetime
 from typing import Union
 import logging
 import awswrangler as wr
 import pandas as pd
-from botocore.exceptions import ClientError
+import re
+from urllib.parse import urlparse
 
 # Workbench Bridges Imports
 from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
 from workbench_bridges.api.parameter_store import ParameterStore
+from workbench_bridges.utils.aws_utils import not_found_returns_none
 
 
 class DFStore:
@@ -23,58 +26,98 @@ class DFStore:
 
         # Add DataFrame
         df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
-        df_store.add("my_data", df)
+        df_store.upsert("/test/my_data", df)
 
         # Retrieve DataFrame
-        df = df_store.get("my_data")
+        df = df_store.get("/test/my_data")
         print(df)
 
         # Delete Data
-        df_store.delete("my_data")
+        df_store.delete("/test/my_data")
         ```
     """
 
-    def __init__(self, s3_df_bucket: str = None):
+    def __init__(self, path_prefix: Union[str, None] = None):
         """DFStore Init Method
 
         Args:
-            s3_df_bucket (str): The S3 Bucket to use for dataframe storage (optional)
+            path_prefix (Union[str, None], optional): Path prefix for storage locations (Defaults to None)
         """
         self.log = logging.getLogger("workbench-bridges")
-        self.prefix = "df_store/"
+        self._base_prefix = "df_store/"
+        self.path_prefix = self._base_prefix + path_prefix if path_prefix else self._base_prefix
+        self.path_prefix = re.sub(r"/+", "/", self.path_prefix)  # Collapse slashes
 
-        # Set the S3 bucket or retrieve it from Parameter Store
+        # Get the Workbench Bucket
         param_key = "/workbench/config/workbench_bucket"
-        self.df_bucket = s3_df_bucket or ParameterStore().get(param_key)
-        if self.df_bucket is None:
-            raise ValueError(f"Either specify S3 Bucket or set '{param_key}' in Parameter Store.")
+        self.workbench_bucket = ParameterStore().get(param_key)
+        if self.workbench_bucket is None:
+            raise ValueError(f"Set '{param_key}' in Parameter Store.")
 
         # Grab a Workbench Session (this allows us to assume the Workbench ExecutionRole)
         self.boto3_session = get_sagemaker_session().boto_session
 
-        # Read all the Pipelines from this S3 path
+        # Get the S3 Client
         self.s3_client = self.boto3_session.client("s3")
 
-    def summary(self) -> pd.DataFrame:
-        """Return a nicely formatted summary of object names, sizes (in MB), and modified dates."""
-        df = self.details()
+    def list(self, include_cache: bool = False) -> list:
+        """List all objects in the data_store prefix
+
+        Args:
+            include_cache (bool, optional): Include cache objects in the list (Defaults to False)
+
+        Returns:
+            list: A list of all the objects in the data_store prefix.
+        """
+        df = self.summary(include_cache=include_cache)
+        return df["location"].tolist()
+
+    def last_modified(self, location: str) -> Union[datetime, None]:
+        """Return the last modified date of a graph.
+
+        Args:
+            location (str): Logical location of the graph.
+
+        Returns:
+            Union[datetime, None]: Last modified datetime or None if not found.
+        """
+        s3_uri = self._generate_s3_uri(location)
+        bucket, key = self._parse_s3_uri(s3_uri)
+
+        try:
+            response = self.s3_client.head_object(Bucket=bucket, Key=key)
+            return response["LastModified"]
+        except self.s3_client.exceptions.ClientError:
+            return None
+
+    def summary(self, include_cache: bool = False) -> pd.DataFrame:
+        """Return a nicely formatted summary of object locations, sizes (in MB), and modified dates.
+
+        Args:
+            include_cache (bool, optional): Include cache objects in the summary (Defaults to False)
+        """
+        df = self.details(include_cache=include_cache)
 
         # Create a formatted DataFrame
         formatted_df = pd.DataFrame(
             {
-                "name": df["name"],
+                "location": df["location"],
                 "size (MB)": (df["size"] / (1024 * 1024)).round(2),  # Convert size to MB
                 "modified": pd.to_datetime(df["modified"]).dt.strftime("%Y-%m-%d %H:%M:%S"),  # Format date
             }
         )
         return formatted_df
 
-    def details(self) -> pd.DataFrame:
-        """Return a DataFrame with detailed metadata for all objects in the data_store prefix."""
+    def details(self, include_cache: bool = False) -> pd.DataFrame:
+        """Return detailed metadata for all objects, optionally excluding the specified prefix.
+
+        Args:
+            include_cache (bool, optional): Include cache objects in the details (Defaults to False)
+        """
         try:
-            response = self.s3_client.list_objects_v2(Bucket=self.df_bucket, Prefix=self.prefix)
+            response = self.s3_client.list_objects_v2(Bucket=self.workbench_bucket, Prefix=self.path_prefix)
             if "Contents" not in response:
-                return pd.DataFrame(columns=["name", "s3_file", "size", "modified"])
+                return pd.DataFrame(columns=["location", "s3_file", "size", "modified"])
 
             # Collect details for each object
             data = []
@@ -82,42 +125,61 @@ class DFStore:
                 full_key = obj["Key"]
 
                 # Reverse logic: Strip the bucket/prefix in the front and .parquet in the end
-                name = full_key.replace(f"{self.prefix}", "/").split(".parquet")[0]
-                s3_file = f"s3://{self.df_bucket}/{full_key}"
+                location = full_key.replace(f"{self.path_prefix}", "/").split(".parquet")[0]
+                s3_file = f"s3://{self.workbench_bucket}/{full_key}"
                 size = obj["Size"]
                 modified = obj["LastModified"]
-                data.append([name, s3_file, size, modified])
+                data.append([location, s3_file, size, modified])
 
-            # Create and return DataFrame
-            df = pd.DataFrame(data, columns=["name", "s3_file", "size", "modified"])
+            # Create the DataFrame
+            df = pd.DataFrame(data, columns=["location", "s3_file", "size", "modified"])
+
+            # Apply the exclude_prefix filter if set
+            cache_prefix = "/workbench/dataframe_cache/"
+            if not include_cache:
+                df = df[~df["location"].str.startswith(cache_prefix)]
+
             return df
 
         except Exception as e:
             self.log.error(f"Failed to get object details: {e}")
-            return pd.DataFrame(columns=["name", "s3_file", "size", "created", "modified"])
+            return pd.DataFrame(columns=["location", "s3_file", "size", "created", "modified"])
 
-    def get(self, name: str) -> pd.DataFrame:
-        """Retrieve a DataFrame from the AWS S3.
+    def check(self, location: str) -> bool:
+        """Check if a DataFrame exists at the specified location
 
         Args:
-            name (str): The name of the data to retrieve.
+            location (str): The location of the data to check.
 
         Returns:
-            pd.DataFrame: The retrieved DataFrame.
+            bool: True if the data exists, False otherwise.
         """
-        s3_uri = self._generate_s3_uri(name)
-        try:
-            df = wr.s3.read_parquet(s3_uri)
-            return df
-        except ClientError:
-            self.log.warning(f"Data '{name}' not found in S3.")
-            return pd.DataFrame()  # Return an empty DataFrame if not found
+        # Generate the specific S3 prefix for the target location
+        s3_prefix = f"{self.path_prefix}/{location}.parquet/"
+        s3_prefix = re.sub(r"/+", "/", s3_prefix)  # Collapse slashes
 
-    def upsert(self, name: str, data: Union[pd.DataFrame, pd.Series]):
-        """Insert or update a DataFrame or Series in AWS S3.
+        # Use list_objects_v2 to check if any objects exist under this specific prefix
+        response = self.s3_client.list_objects_v2(Bucket=self.workbench_bucket, Prefix=s3_prefix, MaxKeys=1)
+        return "Contents" in response
+
+    @not_found_returns_none
+    def get(self, location: str) -> Union[pd.DataFrame, None]:
+        """Retrieve a DataFrame from AWS S3.
 
         Args:
-            name (str): The name of the data.
+            location (str): The location of the data to retrieve.
+
+        Returns:
+            pd.DataFrame: The retrieved DataFrame or None if not found.
+        """
+        s3_uri = self._generate_s3_uri(location)
+        return wr.s3.read_parquet(s3_uri)
+
+    def upsert(self, location: str, data: Union[pd.DataFrame, pd.Series]):
+        """Insert or update a DataFrame or Series in the AWS S3.
+
+        Args:
+            location (str): The location of the data.
             data (Union[pd.DataFrame, pd.Series]): The data to be stored.
         """
         # Check if the data is a Pandas Series, convert it to a DataFrame
@@ -128,49 +190,122 @@ class DFStore:
         if not isinstance(data, pd.DataFrame):
             raise ValueError("Only Pandas DataFrame or Series objects are supported.")
 
-        s3_uri = self._generate_s3_uri(name)
+        # Convert object columns to string type to avoid PyArrow type inference issues.
+        data = self.type_convert_before_parquet(data)
+
+        # Update/Insert the DataFrame to S3
+        s3_uri = self._generate_s3_uri(location)
         try:
             wr.s3.to_parquet(df=data, path=s3_uri, dataset=True, mode="overwrite")
-            self.log.info(f"Data '{name}' added/updated successfully in S3.")
+            self.log.info(f"Dataframe cached {s3_uri}...")
         except Exception as e:
-            self.log.critical(f"Failed to add/update data '{name}': {e}")
+            self.log.error(f"Failed to cache dataframe '{s3_uri}': {e}")
             raise
 
-    def delete(self, name: str):
+    @staticmethod
+    def type_convert_before_parquet(df: pd.DataFrame) -> pd.DataFrame:
+        # Convert object columns to string type to avoid PyArrow type inference issues.
+        df = df.copy()
+        object_cols = df.select_dtypes(include=["object"]).columns
+        df[object_cols] = df[object_cols].astype("str")
+        return df
+
+    def delete(self, location: str):
         """Delete a DataFrame from the AWS S3.
 
         Args:
-            name (str): The name of the data to delete.
+            location (str): The location of the data to delete.
         """
-        s3_uri = self._generate_s3_uri(name)
+        s3_uri = self._generate_s3_uri(location)
 
         # Check if the folder (prefix) exists in S3
         if not wr.s3.list_objects(s3_uri):
-            self.log.warning(f"Data '{name}' does not exist in S3. Cannot delete.")
+            self.log.info(f"Data '{location}' does not exist in S3...")
             return
 
         # Delete the data from S3
         try:
             wr.s3.delete_objects(s3_uri)
-            self.log.info(f"Data '{name}' deleted successfully from S3.")
+            self.log.info(f"Data '{location}' deleted successfully from S3.")
         except Exception as e:
-            self.log.error(f"Failed to delete data '{name}': {e}")
+            self.log.error(f"Failed to delete data '{location}': {e}")
 
-    def _generate_s3_uri(self, name: str) -> str:
-        """Generate the S3 URI for the given name."""
-        s3_path = f"{self.df_bucket}/{self.prefix}{name}.parquet"
-        s3_path = s3_path.replace("//", "/")
-        s3_uri = f"s3://{s3_path}"
-        return s3_uri
+    def delete_recursive(self, location: str):
+        """Recursively delete all data under the specified location in AWS S3.
+
+        Args:
+            location (str): The location prefix of the data to delete.
+        """
+        # Construct the full prefix for S3
+        s3_prefix = re.sub(r"/+", "/", f"{self.path_prefix}/{location}")  # Collapse slashes
+        s3_prefix = s3_prefix.rstrip("/") + "/"  # Ensure the prefix ends with a slash
+
+        # List all objects under the given prefix
+        try:
+            response = self.s3_client.list_objects_v2(Bucket=self.workbench_bucket, Prefix=s3_prefix)
+            if "Contents" not in response:
+                self.log.info(f"No data found under '{s3_prefix}' to delete.")
+                return
+
+            # Gather all keys to delete
+            keys = [{"Key": obj["Key"]} for obj in response["Contents"]]
+            response = self.s3_client.delete_objects(Bucket=self.workbench_bucket, Delete={"Objects": keys})
+            for response in response.get("Deleted", []):
+                self.log.info(f"Deleted: {response['Key']}")
+
+        except Exception as e:
+            self.log.error(f"Failed to delete data recursively at '{location}': {e}")
+
+    def list_subfiles(self, prefix: str) -> list:
+        """Return a list of file locations with the given prefix.
+
+        Args:
+            prefix (str, optional): Only include files with the given prefix
+
+        Returns:
+            list: List of file locations (paths)
+        """
+        try:
+            full_prefix = f"{self.path_prefix}{prefix.lstrip('/')}"
+            response = self.s3_client.list_objects_v2(Bucket=self.workbench_bucket, Prefix=full_prefix)
+            if "Contents" not in response:
+                return []
+
+            locations = []
+            for obj in response["Contents"]:
+                full_key = obj["Key"]
+                location = full_key.replace(f"{self.path_prefix}", "/").split(".parquet")[0]
+                locations.append(location)
+            return locations
+
+        except Exception as e:
+            self.log.error(f"Failed to list subfiles: {e}")
+            return []
+
+    def _generate_s3_uri(self, location: str) -> str:
+        """Generate the S3 URI for the given location."""
+        s3_path = f"{self.workbench_bucket}/{self.path_prefix}/{location}.parquet"
+        return f"s3://{re.sub(r'/+', '/', s3_path)}"
+
+    def _parse_s3_uri(self, s3_uri: str) -> tuple:
+        """Parse an S3 URI into bucket and key."""
+        parsed = urlparse(s3_uri)
+        if parsed.scheme != "s3":
+            raise ValueError(f"Invalid S3 URI: {s3_uri}")
+        return parsed.netloc, parsed.path.lstrip("/")
 
     def __repr__(self):
         """Return a string representation of the DFStore object."""
         # Use the summary() method and format it to align columns for printing
         summary_df = self.summary()
 
-        # Dynamically compute the max length of the 'name' column and add 5 spaces for padding
-        max_name_len = summary_df["name"].str.len().max() + 2
-        summary_df["name"] = summary_df["name"].str.ljust(max_name_len)
+        # Sanity check: If there are no objects, return a message
+        if summary_df.empty:
+            return "DFStore: No data objects found in the store."
+
+        # Dynamically compute the max length of the 'location' column and add 5 spaces for padding
+        max_location_len = summary_df["location"].str.len().max() + 2
+        summary_df["location"] = summary_df["location"].str.ljust(max_location_len)
 
         # Format the size column to include (MB) and ensure 3 spaces between size and date
         summary_df["size (MB)"] = summary_df["size (MB)"].apply(lambda x: f"{x:.2f} MB")
@@ -184,6 +319,7 @@ class DFStore:
 
 if __name__ == "__main__":
     """Exercise the DFStore Class"""
+    import time
 
     # Create a DFStore manager
     df_store = DFStore()
@@ -192,17 +328,25 @@ if __name__ == "__main__":
     print("Detailed Data...")
     print(df_store.details())
 
+    # List all objects
+    print("List Data...")
+    print(df_store.list())
+
     # Add a new DataFrame
     my_df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
-    df_store.upsert("test_data", my_df)
+    df_store.upsert("/testing/test_data", my_df)
+
+    # Check the last modified date
+    print("Last Modified Date:")
+    print(df_store.last_modified("/testing/test_data"))
 
     # Get the DataFrame
-    print(f"Getting data 'test_data':\n{df_store.get('test_data')}")
+    print(f"Getting data 'test_data':\n{df_store.get('/testing/test_data')}")
 
     # Now let's test adding a Series
     series = pd.Series([1, 2, 3, 4], name="Series")
-    df_store.upsert("test_series", series)
-    print(f"Getting data 'test_series':\n{df_store.get('test_series')}")
+    df_store.upsert("/testing/test_series", series)
+    print(f"Getting data 'test_series':\n{df_store.get('/testing/test_series')}")
 
     # Summary of the data
     print("Summary Data...")
@@ -212,6 +356,53 @@ if __name__ == "__main__":
     print("DFStore Object:")
     print(df_store)
 
+    # Check if the data exists
+    print("Check if data exists...")
+    print(df_store.check("/testing/test_data"))
+    print(df_store.check("/testing/test_series"))
+
+    # Time the check
+    start_time = time.time()
+    print(df_store.check("/testing/test_data"))
+    print("--- Check %s seconds ---" % (time.time() - start_time))
+
+    # Test list_subfiles
+    print("List Subfiles:")
+    print(df_store.list_subfiles("/testing"))
+
     # Now delete the test data
+    df_store.delete("/testing/test_data")
+    df_store.delete("/testing/test_series")
+
+    # Check if the data exists
+    print("Check if data exists...")
+    print(df_store.check("/testing/test_data"))
+    print(df_store.check("/testing/test_series"))
+
+    # Add a bunch of dataframes and then test recursive delete
+    for i in range(10):
+        df_store.upsert(f"/testing/data_{i}", pd.DataFrame({"A": [1, 2], "B": [3, 4]}))
+    print("Before Recursive Delete:")
+    print(df_store.summary())
+    df_store.delete_recursive("/testing")
+    print("After Recursive Delete:")
+    print(df_store.summary())
+
+    # Get a non-existent DataFrame
+    print("Getting non-existent data...")
+    print(df_store.get("/testing/no_where"))
+
+    # Test path_prefix
+    df_store = DFStore(path_prefix="/super/test")
+    print(df_store.path_prefix)
+    df_store.upsert("test_data", my_df)
+    print(df_store.get("test_data"))
+    print(df_store.summary())
     df_store.delete("test_data")
-    df_store.delete("test_series")
+    print(df_store.summary())
+
+    # Test columns with Spaces in them
+    my_df = pd.DataFrame({"My A": [1, 2], "My B": [3, 4]})
+    df_store.upsert("/testing/test_data", my_df)
+    my_df = df_store.get("/testing/test_data")
+    print(my_df)

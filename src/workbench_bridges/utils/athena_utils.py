@@ -64,6 +64,7 @@ def dataframe_to_table(df: pd.DataFrame, database: str, table_name: str, mode: s
         path=s3_path,
         dataset=True,
         mode=mode,
+        schema_evolution=False,
         database=database,
         table=table_name,
         boto3_session=boto3_session,

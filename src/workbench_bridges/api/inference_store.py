@@ -46,6 +46,18 @@ class InferenceStore:
         Args:
             df (pd.DataFrame): The DataFrame containing inference results.
         """
+        # Check if table exists (schema is locked after first creation)
+        table_exists = wr.catalog.does_table_exist(self.catalog_db, self.table_name, self.boto3_session)
+
+        if table_exists:
+            # Validate column names match existing table
+            existing_schema = wr.catalog.get_table_types(self.catalog_db, self.table_name, boto3_session=self.boto3_session)
+            existing_columns = list(existing_schema.keys())
+            df_columns = df.columns.tolist()
+
+            if set(df_columns) != set(existing_columns):
+                raise ValueError(f"Schema Validation Error\nExpected columns:\n\t{existing_columns}\nDF columns:\n\t{df_columns}")
+
         self.log.info(f"Adding inference results to {self.catalog_db}.{self.table_name}")
         dataframe_to_table(df, self.catalog_db, self.table_name)
         self.log.info("Inference results added successfully.")
@@ -119,6 +131,39 @@ if __name__ == "__main__":
     print("Running custom query...")
     custom_query = "SELECT * FROM inference_store WHERE compound_id = 1"
     print(inf_store.query(custom_query))
+
+    # Test the schema validation
+    try:
+        # This should raise an error due to schema mismatch
+        invalid_df = pd.DataFrame(
+            {
+                "compound_id": [4, 5],
+                "model_name": ["model4", "model5"],
+                "inference_result": [0.4, 0.5],
+                "extra_column": ["extra1", "extra2"],  # Extra column not in original schema
+            }
+        )
+        inf_store.add_inference_results(invalid_df)
+    except ValueError as e:
+        # A ValueError is expected
+        print(f"Test: Schema Validation Error Expected :)")
+        print(e)
+
+    # Test a type difference
+    try:
+        # This should raise an error due to type mismatch
+        invalid_type_df = pd.DataFrame(
+            {
+                "compound_id": ["6_foo", "7_foo"],  # String instead of int
+                "model_name": ["model6", "model7"],
+                "inference_result": [0.6, 0.7],
+                "timestamp": pd.to_datetime(["2023-01-04", "2023-01-05"]),
+            }
+        )
+        inf_store.add_inference_results(invalid_type_df)
+    except ValueError as e:
+        print(f"Test: Type Validation Error Expected :)")
+        print(e)
 
     # Delete all data
     # inf_store.delete_all_data()

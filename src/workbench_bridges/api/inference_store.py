@@ -51,12 +51,16 @@ class InferenceStore:
 
         if table_exists:
             # Validate column names match existing table
-            existing_schema = wr.catalog.get_table_types(self.catalog_db, self.table_name, boto3_session=self.boto3_session)
+            existing_schema = wr.catalog.get_table_types(
+                self.catalog_db, self.table_name, boto3_session=self.boto3_session
+            )
             existing_columns = list(existing_schema.keys())
             df_columns = df.columns.tolist()
 
             if set(df_columns) != set(existing_columns):
-                raise ValueError(f"Schema Validation Error\nExpected columns:\n\t{existing_columns}\nDF columns:\n\t{df_columns}")
+                raise ValueError(
+                    f"Schema Validation Error\nExpected columns:\n\t{existing_columns}\nDF columns:\n\t{df_columns}"
+                )
 
         self.log.info(f"Adding inference results to {self.catalog_db}.{self.table_name}")
         dataframe_to_table(df, self.catalog_db, self.table_name)
@@ -146,7 +150,7 @@ if __name__ == "__main__":
         inf_store.add_inference_results(invalid_df)
     except ValueError as e:
         # A ValueError is expected
-        print(f"Test: Schema Validation Error Expected :)")
+        print("Test: Schema Validation Error Expected :)")
         print(e)
 
     # Test a type difference
@@ -162,7 +166,7 @@ if __name__ == "__main__":
         )
         inf_store.add_inference_results(invalid_type_df)
     except ValueError as e:
-        print(f"Test: Type Validation Error Expected :)")
+        print("Test: Type Validation Error Expected :)")
         print(e)
 
     # Delete all data

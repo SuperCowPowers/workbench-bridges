@@ -15,7 +15,7 @@ import pandas as pd
 from workbench_bridges.api.inference_store import InferenceStore
 
 # Pandas display options
-pd.set_option('display.max_colwidth', 30)
+pd.set_option("display.max_colwidth", 30)
 
 
 def migrate_schema():
@@ -117,12 +117,12 @@ def preview_migration():
 if __name__ == "__main__":
     import sys
 
-    if len(sys.argv) > 1 and sys.argv[1] == '--preview':
+    if len(sys.argv) > 1 and sys.argv[1] == "--preview":
         preview_migration()
     else:
         # Confirm before proceeding
         response = input("This will delete and recreate the inference_store table. Continue? (yes/no): ")
-        if response.lower() == 'yes':
+        if response.lower() == "yes":
             migrate_schema()
         else:
             print("Migration cancelled.")

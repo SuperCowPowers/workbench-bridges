@@ -58,6 +58,14 @@ def dataframe_to_table(df: pd.DataFrame, database: str, table_name: str, mode: s
     # Create the S3 path
     s3_path = f"s3://{workbench_bucket}/athena/{database}/{table_name}/"
 
+    # Convert timestamp columns to UTC
+    for col in df.columns:
+        if df[col].dtype.name.startswith('datetime'):
+            if df[col].dt.tz is None:
+                df[col] = df[col].dt.tz_localize('UTC')
+            else:
+                df[col] = df[col].dt.tz_convert('UTC')
+
     # Store the DataFrame as a Glue Catalog Table
     wr.s3.to_parquet(
         df=df,

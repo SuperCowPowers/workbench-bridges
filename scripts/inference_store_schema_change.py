@@ -58,10 +58,26 @@ def apply_schema_transformations(df: pd.DataFrame) -> pd.DataFrame:
 
     Modify this function for your specific schema changes
     """
-    from random import choice
 
     # Example transformations - modify as needed:
-    df["tags"] = [["registry"] for _ in range(len(df))]
+
+    # Convert timestamp columns to UTC
+    for col in df.columns:
+        if df[col].dtype.name.startswith('datetime'):
+            print(f"Converting column '{col}' to UTC timezone")
+            if df[col].dt.tz is None:
+                print(f"Column '{col}' is naive, localizing to UTC")
+                df[col] = df[col].dt.tz_localize('UTC')
+            else:
+                print(f"Column '{col}' is already timezone-aware, converting to UTC")
+                df[col] = df[col].dt.tz_convert('UTC')
+
+    # Convert project
+    df["udm_ml_project"] = "IDYA"
+
+    # Replace NaN in the tags column
+    df['tags'] = df['tags'].apply(lambda x: ["registry"] if pd.isna(x) else x)
+    print(df['tags'].value_counts())
 
     # 1. Add new columns with default values
     # if 'tags' not in df.columns:

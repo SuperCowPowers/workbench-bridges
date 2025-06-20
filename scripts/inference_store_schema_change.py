@@ -64,45 +64,17 @@ def apply_schema_transformations(df: pd.DataFrame) -> pd.DataFrame:
     # Convert timestamp columns to UTC
     for col in df.columns:
         if df[col].dtype.name.startswith("datetime"):
-            print(f"Converting column '{col}' to UTC timezone")
             if df[col].dt.tz is None:
                 print(f"Column '{col}' is naive, localizing to UTC")
                 df[col] = df[col].dt.tz_localize("UTC")
-            else:
-                print(f"Column '{col}' is already timezone-aware, converting to UTC")
+            elif df[col].dt.tz.zone != "UTC":
+                print(f"Column '{col}' is timezone-aware, but not UTC, converting to UTC")
                 df[col] = df[col].dt.tz_convert("UTC")
 
-    # Convert project
-    df["udm_ml_project"] = "IDYA"
-
-    # Replace NaN in the tags column
-    df["tags"] = df["tags"].apply(lambda x: ["registry"] if pd.isna(x) else x)
-    print(df["tags"].value_counts())
-
-    # 1. Add new columns with default values
-    # if 'tags' not in df.columns:
-    #     df['tags'] = [[] for _ in range(len(df))]  # Empty list for array<string>
-    #     print("  - Added 'tags' column with empty arrays")
-
-    # 2. Rename columns
-    # if 'compound_id' in df.columns and 'udm_mol_id' not in df.columns:
-    #     df = df.rename(columns={'compound_id': 'udm_mol_id'})
-    #     print("  - Renamed 'compound_id' to 'udm_mol_id'")
-
-    # 3. Change data types
-    # if 'some_column' in df.columns:
-    #     df['some_column'] = df['some_column'].astype('string')
-    #     print("  - Changed 'some_column' to string type")
-
-    # 4. Drop columns
-    # if 'old_column' in df.columns:
-    #     df = df.drop(columns=['old_column'])
-    #     print("  - Dropped 'old_column'")
-
-    # 5. Add computed columns
-    # if 'computed_field' not in df.columns:
-    #     df['computed_field'] = df['existing_field'] * 2
-    #     print("  - Added computed 'computed_field'")
+    # Drop any rows where 'tags' is NaN
+    if "tags" in df.columns:
+        df = df.dropna(subset=["tags"])
+        print(f"Dropped rows with NaN in 'tags' column, remaining rows: {len(df)}")
 
     return df
 

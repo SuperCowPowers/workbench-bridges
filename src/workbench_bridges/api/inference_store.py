@@ -7,7 +7,12 @@ import awswrangler as wr
 
 # Workbench Bridges Imports
 from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
-from workbench_bridges.utils.athena_utils import ensure_catalog_db, sanitize_columns_for_athena, dataframe_to_table, delete_table
+from workbench_bridges.utils.athena_utils import (
+    ensure_catalog_db,
+    sanitize_columns_for_athena,
+    dataframe_to_table,
+    delete_table,
+)
 
 
 class InferenceStore:
@@ -96,7 +101,7 @@ class InferenceStore:
 
             # Convert tags column from string to list
             if "tags" in df.columns:
-                df["tags"] = df["tags"].str.strip('[]').str.split(', ')
+                df["tags"] = df["tags"].str.strip("[]").str.split(", ")
 
             # Convert timestamp columns to UTC if they are naive
             for col in df.select_dtypes(include=["datetime64[ns]"]).columns:

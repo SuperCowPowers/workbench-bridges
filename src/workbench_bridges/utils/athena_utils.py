@@ -50,10 +50,34 @@ def sanitize_columns_for_athena(df):
     """
     # Athena reserved words (partial list - add more as needed)
     RESERVED_WORDS = {
-        'select', 'from', 'where', 'group', 'order', 'by', 'having',
-        'limit', 'offset', 'union', 'join', 'inner', 'left', 'right',
-        'on', 'as', 'and', 'or', 'not', 'in', 'like', 'between',
-        'date', 'time', 'interval', 'case', 'when', 'then'
+        "select",
+        "from",
+        "where",
+        "group",
+        "order",
+        "by",
+        "having",
+        "limit",
+        "offset",
+        "union",
+        "join",
+        "inner",
+        "left",
+        "right",
+        "on",
+        "as",
+        "and",
+        "or",
+        "not",
+        "in",
+        "like",
+        "between",
+        "date",
+        "time",
+        "interval",
+        "case",
+        "when",
+        "then",
     }
 
     new_columns = []
@@ -62,17 +86,17 @@ def sanitize_columns_for_athena(df):
         new_col = str(col).lower()
 
         # Replace spaces and special chars with underscores
-        new_col = re.sub(r'[^\w]', '_', new_col)
+        new_col = re.sub(r"[^\w]", "_", new_col)
 
         # Remove consecutive underscores
-        new_col = re.sub(r'_+', '_', new_col)
+        new_col = re.sub(r"_+", "_", new_col)
 
         # Strip leading/trailing underscores
-        new_col = new_col.strip('_')
+        new_col = new_col.strip("_")
 
         # Handle reserved words
         if new_col in RESERVED_WORDS:
-            new_col += '_col'
+            new_col += "_col"
 
         new_columns.append(new_col)
 

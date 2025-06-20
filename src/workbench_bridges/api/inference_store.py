@@ -7,7 +7,7 @@ import awswrangler as wr
 
 # Workbench Bridges Imports
 from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
-from workbench_bridges.utils.athena_utils import ensure_catalog_db, dataframe_to_table, delete_table
+from workbench_bridges.utils.athena_utils import ensure_catalog_db, sanitize_columns_for_athena, dataframe_to_table, delete_table
 
 
 class InferenceStore:
@@ -46,11 +46,13 @@ class InferenceStore:
         Args:
             df (pd.DataFrame): The DataFrame containing inference results.
         """
+
+        # Sanitize the DataFrame column names
+        df = sanitize_columns_for_athena(df)
+
         # Check if table exists (schema is locked after first creation)
         table_exists = wr.catalog.does_table_exist(self.catalog_db, self.table_name, self.boto3_session)
-
         if table_exists:
-            # Validate column names match existing table
             existing_schema = wr.catalog.get_table_types(
                 self.catalog_db, self.table_name, boto3_session=self.boto3_session
             )
@@ -62,6 +64,7 @@ class InferenceStore:
                     f"Schema Validation Error\nExpected columns:\n\t{existing_columns}\nDF columns:\n\t{df_columns}"
                 )
 
+        # Add the results to the Inference Store
         self.log.info(f"Adding inference results to {self.catalog_db}.{self.table_name}")
         dataframe_to_table(df, self.catalog_db, self.table_name)
         self.log.info("Inference results added successfully.")
@@ -90,6 +93,18 @@ class InferenceStore:
             )
             execution_time = time.time() - start_time
             self.log.info(f"Query completed in {execution_time:.2f} seconds")
+
+            # Convert tags column from string to list
+            if "tags" in df.columns:
+                df["tags"] = df["tags"].str.strip('[]').str.split(', ')
+
+            # Convert timestamp columns to UTC if they are naive
+            for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
+                if df[col].dt.tz is None:
+                    df[col] = df[col].dt.tz_localize("UTC")
+                elif df[col].dt.tz.zone != "UTC":
+                    df[col] = df[col].dt.tz_convert("UTC")
+
             return df
         except Exception as e:
             self.log.error(f"Failed to run query: {e}")
@@ -118,14 +133,15 @@ if __name__ == "__main__":
             "model_name": ["model1", "model2", "model3"],
             "inference_result": [0.1, 0.2, 0.3],
             "timestamp": pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"]),
+            "tags": [["tag1", "tag2"], ["tag2"], ["tag1", "tag3"]],
         }
     )
 
     # Add inference results to the Inference Store
-    inf_store.add_inference_results(df)
+    # inf_store.add_inference_results(df)
 
     # List the total rows
-    print(f"Total rows in Inference Store: {inf_store.total_rows()}")
+    # print(f"Total rows in Inference Store: {inf_store.total_rows()}")
 
     # List all models
     print("Listing Models...")
@@ -135,6 +151,11 @@ if __name__ == "__main__":
     print("Running custom query...")
     custom_query = "SELECT * FROM inference_store WHERE compound_id = 1"
     print(inf_store.query(custom_query))
+
+    # Run a tags query (contains a specific tag)
+    print("Running tags query...")
+    tags_query = "SELECT * FROM inference_store WHERE CONTAINS(tags, 'tag2')"
+    print(inf_store.query(tags_query))
 
     # Test the schema validation
     try:

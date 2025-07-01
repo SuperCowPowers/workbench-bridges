@@ -136,13 +136,12 @@ class ParameterStore:
                 self.log.error(f"Failed to get parameter '{name}': {e}")
             return None
 
-    def upsert(self, name: str, value, overwrite: bool = True):
+    def upsert(self, name: str, value):
         """Insert or update a parameter in the AWS Parameter Store.
 
         Args:
             name (str): The name of the parameter.
             value (str | list | dict): The value of the parameter.
-            overwrite (bool): Whether to overwrite an existing parameter (default: True)
         """
         try:
 
@@ -167,7 +166,7 @@ class ParameterStore:
                 # Insert or update the compressed parameter in Parameter Store
                 try:
                     # Insert or update the compressed parameter in Parameter Store
-                    self.ssm_client.put_parameter(Name=name, Value=encoded_value, Type="String", Overwrite=overwrite)
+                    self.ssm_client.put_parameter(Name=name, Value=encoded_value, Type="String", Overwrite=True)
                     self.log.info(f"Parameter '{name}' added/updated successfully with compression.")
                     return
                 except Exception as e:
@@ -175,7 +174,7 @@ class ParameterStore:
                     raise
 
             # Insert or update the parameter normally if under 4KB
-            self.ssm_client.put_parameter(Name=name, Value=value, Type="String", Overwrite=overwrite)
+            self.ssm_client.put_parameter(Name=name, Value=value, Type="String", Overwrite=True)
             self.log.info(f"Parameter '{name}' added/updated successfully.")
 
         except Exception as e:
@@ -222,14 +221,14 @@ if __name__ == "__main__":
     print(param_store.list())
 
     # Add a new parameter
-    param_store.upsert("/workbench/test", "value", overwrite=True)
+    param_store.upsert("/workbench/test", "value")
 
     # Get the parameter
     print(f"Getting parameter 'test': {param_store.get('/workbench/test')}")
 
     # Add a dictionary as a parameter
     sample_dict = {"key": "str_value", "awesome_value": 4.2}
-    param_store.upsert("/workbench/my_data", sample_dict, overwrite=True)
+    param_store.upsert("/workbench/my_data", sample_dict)
 
     # Retrieve the parameter as a dictionary
     retrieved_value = param_store.get("/workbench/my_data")

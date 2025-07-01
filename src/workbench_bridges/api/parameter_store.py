@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 
 # Workbench-Bridges Imports
 from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
+from workbench_bridges.utils.json_utils import CustomEncoder
 
 
 class ParameterStore:
@@ -125,7 +126,7 @@ class ParameterStore:
                 parsed_value = json.loads(value)
                 return parsed_value
             except (json.JSONDecodeError, TypeError):
-                # If parsing fails, return the value as is (assumed to be a simple string)
+                # If parsing fails, return the value as is "hope for the best"
                 return value
 
         except ClientError as e:
@@ -136,50 +137,78 @@ class ParameterStore:
                 self.log.error(f"Failed to get parameter '{name}': {e}")
             return None
 
-    def upsert(self, name: str, value):
+    def upsert(self, name: str, value, precision: int = 3):
         """Insert or update a parameter in the AWS Parameter Store.
 
         Args:
             name (str): The name of the parameter.
             value (str | list | dict): The value of the parameter.
+            precision (int): The precision for float values in the JSON encoding.
         """
         try:
+            # Convert to JSON and check if compression is needed
+            json_value = json.dumps(value, cls=CustomEncoder, precision=precision)
+            if len(json_value) <= 4096:
+                # Store normally if under 4KB
+                self._store_parameter(name, json_value)
+                return
 
-            # Anything that's not a string gets converted to JSON
-            if not isinstance(value, str):
-                value = json.dumps(value)
+            # Need compression - log warning
+            self.log.important(
+                f"Parameter {name} exceeds 4KB ({len(json_value)} bytes): compressing and reducing precision..."
+            )
 
-            # Check size and compress if necessary
-            if len(value) > 4096:
-                self.log.warning(f"Parameter {name} exceeds 4KB ({len(value)} Bytes)  Compressing...")
-                compressed_value = zlib.compress(value.encode("utf-8"), level=9)
-                encoded_value = "COMPRESSED:" + base64.b64encode(compressed_value).decode("utf-8")
+            # Try compression with precision reduction
+            compressed_value = self._compress_value(value)
 
-                # Report on the size of the compressed value
-                compressed_size = len(compressed_value)
-                if compressed_size > 4096:
-                    doc_link = "https://supercowpowers.github.io/workbench/api_classes/df_store"
-                    self.log.error(f"Compressed size {compressed_size} bytes, cannot store > 4KB")
-                    self.log.error(f"For larger data use the DFStore() class ({doc_link})")
-                    return
+            if len(compressed_value) <= 4096:
+                self._store_parameter(name, compressed_value)
+                return
 
-                # Insert or update the compressed parameter in Parameter Store
-                try:
-                    # Insert or update the compressed parameter in Parameter Store
-                    self.ssm_client.put_parameter(Name=name, Value=encoded_value, Type="String", Overwrite=True)
-                    self.log.info(f"Parameter '{name}' added/updated successfully with compression.")
-                    return
-                except Exception as e:
-                    self.log.critical(f"Failed to add/update compressed parameter '{name}': {e}")
-                    raise
+            # Try clipping the data
+            clipped_value = self._clip_data(value)
+            compressed_clipped = self._compress_value(clipped_value)
 
-            # Insert or update the parameter normally if under 4KB
-            self.ssm_client.put_parameter(Name=name, Value=value, Type="String", Overwrite=True)
-            self.log.info(f"Parameter '{name}' added/updated successfully.")
+            if len(compressed_clipped) <= 4096:
+                self.log.warning(
+                    f"Parameter {name} data clipped to 100 items/elements: ({len(compressed_clipped)} bytes)"
+                )
+                self._store_parameter(name, compressed_clipped)
+                return
+
+            # Still too large - give up
+            self._handle_oversized_data(name, len(compressed_clipped))
 
         except Exception as e:
             self.log.critical(f"Failed to add/update parameter '{name}': {e}")
             raise
+
+    @staticmethod
+    def _compress_value(value) -> str:
+        """Compress a value with precision reduction."""
+        json_value = json.dumps(value, cls=CustomEncoder, precision=3)
+        compressed = zlib.compress(json_value.encode("utf-8"), level=9)
+        return "COMPRESSED:" + base64.b64encode(compressed).decode("utf-8")
+
+    @staticmethod
+    def _clip_data(value):
+        """Clip data to reduce size, clip to first 100 items/elements."""
+        if isinstance(value, dict):
+            return dict(list(value.items())[:100])
+        elif isinstance(value, list):
+            return value[:100]
+        return value
+
+    def _store_parameter(self, name: str, value: str):
+        """Store parameter in AWS Parameter Store."""
+        self.ssm_client.put_parameter(Name=name, Value=value, Type="String", Overwrite=True)
+        self.log.info(f"Parameter '{name}' added/updated successfully.")
+
+    def _handle_oversized_data(self, name: str, size: int):
+        """Handle data that's too large even after compression and clipping."""
+        doc_link = "https://supercowpowers.github.io/workbench/api_classes/df_store"
+        self.log.error(f"Compressed size {size} bytes, cannot store > 4KB")
+        self.log.error(f"For larger data use the DFStore() class ({doc_link})")
 
     def delete(self, name: str):
         """Delete a parameter from the AWS Parameter Store.

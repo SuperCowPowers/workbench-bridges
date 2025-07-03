@@ -171,6 +171,7 @@ def dataframe_to_table(df: pd.DataFrame, database: str, table_name: str, mode: s
         boto3_session=boto3_session,
     )
 
+
 def delete_table(table_name: str, database: str, include_s3_files: bool = True):
     """Delete a table from the Glue Catalog
 

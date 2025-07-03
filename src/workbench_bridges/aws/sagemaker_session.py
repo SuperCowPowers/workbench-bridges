@@ -25,9 +25,9 @@ def get_sagemaker_session() -> sagemaker.Session:
             aws_secret_access_key=credentials["SecretAccessKey"],
             aws_session_token=credentials["SessionToken"],
         )
-    except Exception as e:
+    except Exception:
         # Log the failure and proceed with the default session
-        print(f"Failed to assume Workbench role, this is probably fine...")
+        print("Failed to assume Workbench role, this is probably fine...")
 
     return session
 

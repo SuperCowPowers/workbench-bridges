@@ -78,7 +78,9 @@ class InferenceStore:
         # Verify that we have all the schema columns
         missing_columns = set(self.schema) - set(df.columns)
         if missing_columns:
-            raise ValueError(f"DataFrame is missing required columns: {missing_columns}. Expected schema: {self.schema}")
+            raise ValueError(
+                f"DataFrame is missing required columns: {missing_columns}. Expected schema: {self.schema}"
+            )
 
         # Enforce proper data types for all columns
         df = self._enforce_schema_types(df)
@@ -150,22 +152,22 @@ class InferenceStore:
 
         # Type enforcement mapping
         type_mapping = {
-            'id': 'string',
-            'timestamp': 'datetime64[ms]',
-            'model': 'string',
-            'pred_label': 'string',
-            'pred_value': 'float64',
-            'tags': 'object',  # Special handling for lists
-            'meta': 'string'
+            "id": "string",
+            "timestamp": "datetime64[ms]",
+            "model": "string",
+            "pred_label": "string",
+            "pred_value": "float64",
+            "tags": "object",  # Special handling for lists
+            "meta": "string",
         }
 
         for col, dtype in type_mapping.items():
             if col in df.columns:
                 try:
-                    if col == 'tags':
+                    if col == "tags":
                         # Ensure tags is always a list, even if empty
                         df[col] = df[col].apply(lambda x: x if isinstance(x, list) else [] if pd.isna(x) else [str(x)])
-                    elif col == 'timestamp':
+                    elif col == "timestamp":
                         # Handle timestamp conversion more carefully
                         if not pd.api.types.is_datetime64_any_dtype(df[col]):
                             df[col] = pd.to_datetime(df[col])
@@ -185,13 +187,13 @@ class InferenceStore:
 
         # Define the table schema with proper types
         table_schema = {
-            'id': 'string',
-            'timestamp': 'timestamp',
-            'model': 'string',
-            'pred_label': 'string',
-            'pred_value': 'double',
-            'tags': 'array<string>',
-            'meta': 'string'
+            "id": "string",
+            "timestamp": "timestamp",
+            "model": "string",
+            "pred_label": "string",
+            "pred_value": "double",
+            "tags": "array<string>",
+            "meta": "string",
         }
         s3_path = table_s3_path(database=self.catalog_db, table_name=self.table_name)
         wr.catalog.create_parquet_table(

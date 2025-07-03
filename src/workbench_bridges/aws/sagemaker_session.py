@@ -27,7 +27,7 @@ def get_sagemaker_session() -> sagemaker.Session:
         )
     except Exception as e:
         # Log the failure and proceed with the default session
-        print(f"Warning: Failed to assume Workbench role. Using default session. Error: {e}")
+        print(f"Failed to assume Workbench role, this is probably fine...")
 
     return session
 

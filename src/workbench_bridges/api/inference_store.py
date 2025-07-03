@@ -9,8 +9,8 @@ import awswrangler as wr
 from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
 from workbench_bridges.utils.athena_utils import (
     ensure_catalog_db,
-    sanitize_columns_for_athena,
     dataframe_to_table,
+    table_s3_path,
     delete_table,
 )
 
@@ -36,38 +36,55 @@ class InferenceStore:
         self.catalog_db = catalog_db
         self.table_name = table_name
         self.boto3_session = get_sagemaker_session().boto_session
+        self.schema = ["id", "model", "pred_label", "pred_value", "tags", "meta", "timestamp"]
 
         # Ensure Glue catalog DB exists
         ensure_catalog_db(catalog_db)
 
         # Ensure the Table exists
         if not wr.catalog.does_table_exist(self.catalog_db, self.table_name, self.boto3_session):
-            self.log.error(f"Table {self.table_name} does not exist in database {self.catalog_db}.")
-            self.log.error("Call `add_inference_results` to create the table.")
+            self.log.warning(f"Table {self.table_name} does not exist in database {self.catalog_db}.")
+            self.log.important(f"Creating table {self.table_name}...")
+            self._create_empty_table()
 
-    def add_inference_results(self, df: pd.DataFrame):
+    def add_inference_results(self, df: pd.DataFrame, schema_map: dict = None, meta_fields: list = None):
         """Add inference results to the Inference Store
 
         Args:
             df (pd.DataFrame): The DataFrame containing inference results.
+            schema_map (dict, optional): A mapping of DataFrame columns to Inference Store schema columns.
+            meta_fields (list, optional): Additional metadata fields to include in the Inference Store.
         """
 
-        # Sanitize the DataFrame column names
-        df = sanitize_columns_for_athena(df)
+        # Apply schema mapping if provided
+        if schema_map:
+            self.log.info(f"Applying schema mapping: {schema_map}")
+            df = df.rename(columns=schema_map)
 
-        # Check if table exists (schema is locked after first creation)
-        table_exists = wr.catalog.does_table_exist(self.catalog_db, self.table_name, self.boto3_session)
-        if table_exists:
-            existing_schema = wr.catalog.get_table_types(
-                self.catalog_db, self.table_name, boto3_session=self.boto3_session
-            )
-            existing_columns = list(existing_schema.keys())
-            df_columns = df.columns.tolist()
+        # Convert all meta fields to a combined JSON string and put into the 'meta' column
+        if meta_fields:
+            self.log.info(f"Combining metadata fields: {meta_fields}")
+            df["meta"] = df[meta_fields].apply(lambda row: row.to_json(), axis=1)
+            df.drop(columns=meta_fields, inplace=True)
+        else:
+            df["meta"] = pd.Series(dtype="string")
 
-            if set(df_columns) != set(existing_columns):
-                raise ValueError(
-                    f"Schema Validation Error\nExpected columns:\n\t{existing_columns}\nDF columns:\n\t{df_columns}"
-                )
+        # If "pred_label" or "pred_value" columns are missing, create them with default values
+        if "pred_label" not in df.columns:
+            df["pred_label"] = pd.Series([None] * len(df), dtype="string")
+        if "pred_value" not in df.columns:
+            df["pred_value"] = pd.Series([None] * len(df), dtype="float64")
+
+        # Verify that we have all the schema columns
+        missing_columns = set(self.schema) - set(df.columns)
+        if missing_columns:
+            raise ValueError(f"DataFrame is missing required columns: {missing_columns}. Expected schema: {self.schema}")
+
+        # Enforce proper data types for all columns
+        df = self._enforce_schema_types(df)
+
+        # Subset the DataFrame to only include the schema columns
+        df = df[self.schema]
 
         # Add the results to the Inference Store
         self.log.info(f"Adding inference results to {self.catalog_db}.{self.table_name}")
@@ -120,6 +137,71 @@ class InferenceStore:
         self.log.info(f"Deleting all data from {self.catalog_db}.{self.table_name}")
         delete_table(self.table_name, self.catalog_db)
 
+    def _enforce_schema_types(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Enforce proper data types for all columns according to the schema
+
+        Args:
+            df (pd.DataFrame): The DataFrame to type-convert
+
+        Returns:
+            pd.DataFrame: DataFrame with properly typed columns
+        """
+        self.log.info("Enforcing schema types...")
+
+        # Type enforcement mapping
+        type_mapping = {
+            'id': 'string',
+            'timestamp': 'datetime64[ms]',
+            'model': 'string',
+            'pred_label': 'string',
+            'pred_value': 'float64',
+            'tags': 'object',  # Special handling for lists
+            'meta': 'string'
+        }
+
+        for col, dtype in type_mapping.items():
+            if col in df.columns:
+                try:
+                    if col == 'tags':
+                        # Ensure tags is always a list, even if empty
+                        df[col] = df[col].apply(lambda x: x if isinstance(x, list) else [] if pd.isna(x) else [str(x)])
+                    elif col == 'timestamp':
+                        # Handle timestamp conversion more carefully
+                        if not pd.api.types.is_datetime64_any_dtype(df[col]):
+                            df[col] = pd.to_datetime(df[col])
+                    else:
+                        # Standard type conversion
+                        df[col] = df[col].astype(dtype)
+
+                except Exception as e:
+                    raise ValueError(f"Failed to convert column '{col}' to type '{dtype}': {e}")
+
+        # Return the DataFrame with enforced types
+        return df
+
+    def _create_empty_table(self):
+        """Create an empty table directly using AWS Data Wrangler with proper column types"""
+        self.log.important(f"Creating empty table {self.table_name} in database {self.catalog_db}")
+
+        # Define the table schema with proper types
+        table_schema = {
+            'id': 'string',
+            'timestamp': 'timestamp',
+            'model': 'string',
+            'pred_label': 'string',
+            'pred_value': 'double',
+            'tags': 'array<string>',
+            'meta': 'string'
+        }
+        s3_path = table_s3_path(database=self.catalog_db, table_name=self.table_name)
+        wr.catalog.create_parquet_table(
+            database=self.catalog_db,
+            table=self.table_name,
+            path=s3_path,
+            columns_types=table_schema,
+            boto3_session=self.boto3_session,
+        )
+
     def __repr__(self):
         """Return a string representation of the InferenceStore object."""
         return f"InferenceStore(catalog_db={self.catalog_db}, table_name={self.table_name})"
@@ -134,7 +216,7 @@ if __name__ == "__main__":
     # Create a DataFrame
     df = pd.DataFrame(
         {
-            "compound_id": [1, 2, 3],
+            "compound_id": [1, 2, 3],  # Note: These will be converted to strings
             "model_name": ["model1", "model2", "model3"],
             "inference_result": [0.1, 0.2, 0.3],
             "timestamp": pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"]),
@@ -143,18 +225,19 @@ if __name__ == "__main__":
     )
 
     # Add inference results to the Inference Store
-    # inf_store.add_inference_results(df)
+    schema_map = {"compound_id": "id", "model_name": "model", "inference_result": "pred_value"}
+    inf_store.add_inference_results(df, schema_map=schema_map)
 
     # List the total rows
-    # print(f"Total rows in Inference Store: {inf_store.total_rows()}")
+    print(f"Total rows in Inference Store: {inf_store.total_rows()}")
 
     # List all models
     print("Listing Models...")
-    print(inf_store.query("SELECT distinct model_name FROM inference_store"))
+    print(inf_store.query("SELECT distinct model FROM inference_store"))
 
     # Run a custom query
     print("Running custom query...")
-    custom_query = "SELECT * FROM inference_store WHERE compound_id = 1"
+    custom_query = "SELECT * FROM inference_store WHERE id = '1'"
     print(inf_store.query(custom_query))
 
     # Run a tags query (contains a specific tag)
@@ -162,38 +245,23 @@ if __name__ == "__main__":
     tags_query = "SELECT * FROM inference_store WHERE CONTAINS(tags, 'tag2')"
     print(inf_store.query(tags_query))
 
-    # Test the schema validation
-    try:
-        # This should raise an error due to schema mismatch
-        invalid_df = pd.DataFrame(
-            {
-                "compound_id": [4, 5],
-                "model_name": ["model4", "model5"],
-                "inference_result": [0.4, 0.5],
-                "extra_column": ["extra1", "extra2"],  # Extra column not in original schema
-            }
-        )
-        inf_store.add_inference_results(invalid_df)
-    except ValueError as e:
-        # A ValueError is expected
-        print("Test: Schema Validation Error Expected :)")
-        print(e)
+    # Test the metadata handling
+    df["project"] = ["A", "B", "C"]
+    df["experiment"] = ["exp1", "exp2", "exp3"]
+    inf_store.add_inference_results(df, schema_map=schema_map, meta_fields=["project", "experiment"])
 
-    # Test a type difference
-    try:
-        # This should raise an error due to type mismatch
-        invalid_type_df = pd.DataFrame(
-            {
-                "compound_id": ["6_foo", "7_foo"],  # String instead of int
-                "model_name": ["model6", "model7"],
-                "inference_result": [0.6, 0.7],
-                "timestamp": pd.to_datetime(["2023-01-04", "2023-01-05"]),
-            }
-        )
-        inf_store.add_inference_results(invalid_type_df)
-    except ValueError as e:
-        print("Test: Type Validation Error Expected :)")
-        print(e)
+    # Test schema validation with a columns type difference (inference_result should be float)
+    # The inference store class will automatically convert the types
+    invalid_type_df = pd.DataFrame(
+        {
+            "compound_id": [1, 2, 3],  # Note: These will be converted to strings
+            "model_name": ["model1", "model2", "model3"],
+            "inference_result": ["0.1", "0.2", "0.3"],
+            "timestamp": pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"]),
+            "tags": [["tag1", "tag2"], ["tag2"], ["tag1", "tag3"]],
+        }
+    )
+    inf_store.add_inference_results(df, schema_map=schema_map)
 
     # Delete all data
     # inf_store.delete_all_data()

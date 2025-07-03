@@ -108,6 +108,27 @@ def sanitize_columns_for_athena(df):
     return df.rename(columns=dict(zip(df.columns, new_columns)))
 
 
+def table_s3_path(database: str, table_name: str) -> str:
+    """Get the S3 path for a Glue Catalog Table
+
+    Args:
+        database (str): The name of the Glue Catalog database
+        table_name (str): The name of the table
+
+    Returns:
+        str: The S3 path for the table
+    """
+
+    # Get the Workbench Bucket
+    param_key = "/workbench/config/workbench_bucket"
+    workbench_bucket = ParameterStore().get(param_key)
+    if workbench_bucket is None:
+        raise ValueError(f"Set '{param_key}' in Parameter Store.")
+
+    # Return the S3 path for the table
+    return f"s3://{workbench_bucket}/athena/{database}/{table_name}/"
+
+
 def dataframe_to_table(df: pd.DataFrame, database: str, table_name: str, mode: str = "append"):
     """Store a DataFrame as a Glue Catalog Table
 
@@ -128,7 +149,7 @@ def dataframe_to_table(df: pd.DataFrame, database: str, table_name: str, mode: s
         raise ValueError(f"Set '{param_key}' in Parameter Store.")
 
     # Create the S3 path
-    s3_path = f"s3://{workbench_bucket}/athena/{database}/{table_name}/"
+    s3_path = table_s3_path(database, table_name)
 
     # Convert timestamp columns to UTC
     for col in df.columns:

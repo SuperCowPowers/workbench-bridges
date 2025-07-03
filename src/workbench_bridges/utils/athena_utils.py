@@ -171,13 +171,6 @@ def dataframe_to_table(df: pd.DataFrame, database: str, table_name: str, mode: s
         boto3_session=boto3_session,
     )
 
-    # Verify that the table is created
-    if wr.catalog.does_table_exist(database=database, table=table_name, boto3_session=boto3_session):
-        log.info(f"Table {table_name} successfully created in database {database}.")
-    else:
-        log.critical(f"Failed to create table {table_name} in database {database}.")
-
-
 def delete_table(table_name: str, database: str, include_s3_files: bool = True):
     """Delete a table from the Glue Catalog
 

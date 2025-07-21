@@ -59,6 +59,8 @@ class InferenceStore:
         # Apply schema mapping if provided
         if schema_map:
             self.log.info(f"Applying schema mapping: {schema_map}")
+            # Drop existing columns that would conflict with renamed columns
+            df = df.drop(columns=[col for col in schema_map.values() if col in df.columns], errors="ignore")
             df = df.rename(columns=schema_map)
 
         # Convert all meta fields to a combined JSON string and put into the 'meta' column

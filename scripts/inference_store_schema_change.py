@@ -60,6 +60,9 @@ def apply_schema_transformations(df: pd.DataFrame) -> pd.DataFrame:
     """
 
     # Example transformations - modify as needed:
+    # Change the 'monitor' tag to 'capture' (if tags == ['monitor'] change to ['capture'])
+    if "tags" in df.columns:
+        df["tags"] = df["tags"].apply(lambda x: ["capture"] if x == ["monitor"] else x)
 
     # Convert timestamp columns to UTC
     for col in df.columns:
@@ -67,9 +70,14 @@ def apply_schema_transformations(df: pd.DataFrame) -> pd.DataFrame:
             if df[col].dt.tz is None:
                 print(f"Column '{col}' is naive, localizing to UTC")
                 df[col] = df[col].dt.tz_localize("UTC")
-            elif df[col].dt.tz.zone != "UTC":
-                print(f"Column '{col}' is timezone-aware, but not UTC, converting to UTC")
-                df[col] = df[col].dt.tz_convert("UTC")
+            else:
+                # Check if it's already UTC using string representation
+                tz_str = str(df[col].dt.tz)
+                if tz_str not in ["UTC", "UTC+00:00", "+00:00"] and df[col].dt.tz != pd.Timestamp.now().tz_localize('UTC').tz:
+                    print(f"Column '{col}' is timezone-aware ({tz_str}), converting to UTC")
+                    df[col] = df[col].dt.tz_convert("UTC")
+                else:
+                    print(f"Column '{col}' is already in UTC")
 
     # Drop any rows where 'tags' is NaN
     if "tags" in df.columns:

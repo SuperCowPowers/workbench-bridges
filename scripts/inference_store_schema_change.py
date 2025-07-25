@@ -73,7 +73,10 @@ def apply_schema_transformations(df: pd.DataFrame) -> pd.DataFrame:
             else:
                 # Check if it's already UTC using string representation
                 tz_str = str(df[col].dt.tz)
-                if tz_str not in ["UTC", "UTC+00:00", "+00:00"] and df[col].dt.tz != pd.Timestamp.now().tz_localize('UTC').tz:
+                if (
+                    tz_str not in ["UTC", "UTC+00:00", "+00:00"]
+                    and df[col].dt.tz != pd.Timestamp.now().tz_localize("UTC").tz
+                ):
                     print(f"Column '{col}' is timezone-aware ({tz_str}), converting to UTC")
                     df[col] = df[col].dt.tz_convert("UTC")
                 else:

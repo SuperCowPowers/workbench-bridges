@@ -196,7 +196,7 @@ class DFStore:
         # Update/Insert the DataFrame to S3
         s3_uri = self._generate_s3_uri(location)
         try:
-            wr.s3.to_parquet(df=data, path=s3_uri, dataset=True, mode="overwrite")
+            wr.s3.to_parquet(df=data, path=s3_uri, dataset=True, mode="overwrite", index=True)
             self.log.info(f"Dataframe cached {s3_uri}...")
         except Exception as e:
             self.log.error(f"Failed to cache dataframe '{s3_uri}': {e}")
@@ -342,6 +342,12 @@ if __name__ == "__main__":
 
     # Get the DataFrame
     print(f"Getting data 'test_data':\n{df_store.get('/testing/test_data')}")
+
+    # Test a dataframe with a custom index
+    my_df_with_index = pd.DataFrame({"A": [1, 2], "B": [3, 4]}, index=["row1", "row2"])
+    my_df_with_index.index.name = "CustomIndex"
+    df_store.upsert("/testing/test_data_with_index", my_df_with_index)
+    print(f"Getting data 'test_data_with_index':\n{df_store.get('/testing/test_data_with_index')}")
 
     # Now let's test adding a Series
     series = pd.Series([1, 2, 3, 4], name="Series")

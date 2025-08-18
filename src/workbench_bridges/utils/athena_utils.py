@@ -14,29 +14,6 @@ from workbench_bridges.api.parameter_store import ParameterStore
 log = logging.getLogger("workbench-bridges")
 
 
-def ensure_catalog_db(catalog_db: str):
-    """Ensure that the AWS Data Catalog Database exists"""
-
-    # Grab a Workbench Session (this allows us to assume the Workbench ExecutionRole)
-    log.info("Assuming Workbench Execution Role...")
-    sagemaker_session = get_sagemaker_session()
-    boto3_session = sagemaker_session.boto_session
-
-    log.important(f"Ensuring that the AWS Data Catalog Database {catalog_db} exists...")
-    try:
-        wr.catalog.create_database(catalog_db, exist_ok=True, boto3_session=boto3_session)
-    except ClientError as e:
-        if e.response["Error"]["Code"] == "AccessDeniedException":
-            log.error(f"AccessDeniedException {e}")
-            log.error(f"Access denied while trying to create/access the catalog database '{catalog_db}'.")
-            log.error("Create the database manually in the AWS Glue Console, or run this command:")
-            log.error(f'aws glue create-database --database-input \'{{"Name": "{catalog_db}"}}\'')
-            sys.exit(1)
-        else:
-            log.error(f"Unexpected error: {e}")
-            sys.exit(1)
-
-
 def sanitize_columns_for_athena(df):
     """
     Sanitize DataFrame column names for Athena compatibility.
@@ -212,11 +189,6 @@ def delete_table(table_name: str, database: str, include_s3_files: bool = True):
 
 
 if __name__ == "__main__":
-
-    # Example usage
-    my_catalog_db = "inference_store"
-    ensure_catalog_db(my_catalog_db)
-    print(f"Catalog database '{my_catalog_db}' exists.")
 
     # Example DataFrame
     df = pd.DataFrame(

@@ -8,7 +8,6 @@ import awswrangler as wr
 # Workbench Bridges Imports
 from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
 from workbench_bridges.utils.athena_utils import (
-    ensure_catalog_db,
     dataframe_to_table,
     table_s3_path,
     delete_table,
@@ -37,9 +36,6 @@ class InferenceStore:
         self.table_name = table_name
         self.boto3_session = get_sagemaker_session().boto_session
         self.schema = ["id", "model", "pred_label", "pred_value", "tags", "meta", "timestamp"]
-
-        # Ensure Glue catalog DB exists
-        ensure_catalog_db(catalog_db)
 
         # Ensure the Table exists
         if not wr.catalog.does_table_exist(self.catalog_db, self.table_name, self.boto3_session):

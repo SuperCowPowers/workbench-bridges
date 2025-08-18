@@ -1,11 +1,9 @@
 """Athena Utils: Utility functions for AWS Athena."""
 
-import sys
 import re
 import logging
 import pandas as pd
 import awswrangler as wr
-from botocore.exceptions import ClientError
 
 # Workbench-Bridges Imports
 from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
@@ -202,6 +200,7 @@ if __name__ == "__main__":
     )
 
     # Store the DataFrame as a Glue Catalog Table
+    my_catalog_db = "inference_store"
     dataframe_to_table(df, my_catalog_db, "test_table")
     print(f"DataFrame stored as Glue table 'test_table' in database '{my_catalog_db}'.")
 

@@ -21,8 +21,7 @@ def get_sagemaker_session() -> sagemaker.Session:
         account_id = session.boto_session.client("sts").get_caller_identity()["Account"]
         try:
             assumed_role = boto3.client("sts").assume_role(
-                RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-                RoleSessionName="WorkbenchSession"
+                RoleArn=f"arn:aws:iam::{account_id}:role/{role}", RoleSessionName="WorkbenchSession"
             )
             credentials = assumed_role["Credentials"]
             session.boto_session = boto3.Session(
@@ -37,7 +36,6 @@ def get_sagemaker_session() -> sagemaker.Session:
 
 
 if __name__ == "__main__":
-    from botocore.exceptions import ClientError
     from workbench_bridges.api.parameter_store import ParameterStore
 
     # Get SageMaker Session

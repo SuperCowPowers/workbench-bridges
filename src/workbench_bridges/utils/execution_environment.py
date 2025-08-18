@@ -5,11 +5,11 @@ import sys
 import logging
 import requests
 
-# Workbench imports
-from workbench.utils.glue_utils import get_resolved_options
+# Workbench Bridge Imports
+from workbench_bridges.utils.glue_utils import get_resolved_options
 
 # Set up the logger
-log = logging.getLogger("workbench")
+log = logging.getLogger("workbench-bridges")
 
 
 def running_on_glue() -> bool:

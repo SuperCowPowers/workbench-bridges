@@ -65,7 +65,7 @@ class InferenceStore:
             df["meta"] = df[meta_fields].apply(lambda row: row.to_json(), axis=1)
             df.drop(columns=meta_fields, inplace=True)
         else:
-            df["meta"] = pd.Series(dtype="string")
+            df["meta"] = pd.Series('{}', index=df.index, dtype="string")
 
         # If "pred_label" or "pred_value" columns are missing, create them with default values
         if "pred_label" not in df.columns:

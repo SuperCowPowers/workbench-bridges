@@ -1,5 +1,5 @@
 """Athena Utils: Utility functions for AWS Athena."""
-
+import os
 import re
 import logging
 import pandas as pd
@@ -98,7 +98,13 @@ def table_s3_path(database: str, table_name: str) -> str:
     param_key = "/workbench/config/workbench_bucket"
     workbench_bucket = ParameterStore().get(param_key)
     if workbench_bucket is None:
-        raise ValueError(f"Set '{param_key}' in Parameter Store.")
+        # Try to get from environment variable as fallback
+        workbench_bucket = os.environ.get("WORKBENCH_BUCKET")
+        if workbench_bucket is None:
+            raise ValueError(f"Set '{param_key}' in Parameter Store or set WORKBENCH_BUCKET ENV variable.")
+        else:
+            log.info(f"Upserting WORKBENCH_BUCKET={workbench_bucket} into Parameter Store at '{param_key}'")
+            ParameterStore().upsert(param_key, workbench_bucket)
 
     # Return the S3 path for the table
     return f"s3://{workbench_bucket}/athena/{database}/{table_name}/"

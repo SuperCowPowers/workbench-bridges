@@ -1,4 +1,5 @@
 """Athena Utils: Utility functions for AWS Athena."""
+
 import os
 import re
 import logging

@@ -59,8 +59,16 @@ class InferenceStore:
             df = df.drop(columns=[col for col in schema_map.values() if col in df.columns], errors="ignore")
             df = df.rename(columns=schema_map)
 
+        # Check for existing meta data
+        if "meta" in df.columns:
+            # Check for any blanks or NaNs in the meta column
+            self.log.info("Using existing 'meta' column for metadata.")
+            df["meta"] = df["meta"].apply(lambda x: "{}" if pd.isna(x) or x == "" else x)
+            if meta_fields:
+                self.log.warning("Both 'meta' column and 'meta_fields' provided. Ignoring 'meta_fields'.")
+
         # Convert all meta fields to a combined JSON string and put into the 'meta' column
-        if meta_fields:
+        elif meta_fields:
             self.log.info(f"Combining metadata fields: {meta_fields}")
             df["meta"] = df[meta_fields].apply(lambda row: row.to_json(), axis=1)
             df.drop(columns=meta_fields, inplace=True)

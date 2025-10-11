@@ -60,6 +60,7 @@ def apply_schema_transformations(df: pd.DataFrame) -> pd.DataFrame:
     """
 
     # Example transformations - modify as needed:
+    """
     # Change the 'monitor' tag to 'capture' (if tags == ['monitor'] change to ['capture'])
     if "tags" in df.columns:
         df["tags"] = df["tags"].apply(lambda x: ["capture"] if x == ["monitor"] else x)
@@ -86,6 +87,27 @@ def apply_schema_transformations(df: pd.DataFrame) -> pd.DataFrame:
     if "tags" in df.columns:
         df = df.dropna(subset=["tags"])
         print(f"Dropped rows with NaN in 'tags' column, remaining rows: {len(df)}")
+
+    # TEMP: Drop any rows where "capture" is in the 'tags' list
+    initial_count = len(df)
+    df = df[~df["tags"].apply(lambda x: "capture" in x)]
+    dropped_count = initial_count - len(df)
+    if dropped_count > 0:
+        print(f"Dropped {dropped_count} rows with 'capture' in 'tags', remaining rows: {len(df)}")
+    """
+    # Show the range of dates before filtering
+    print(f"Timestamp range before filtering: {df['timestamp'].min()} to {df['timestamp'].max()}")
+
+    # Remove rows where timestamp is within the last 48 hours
+    initial_count = len(df)
+    cutoff_time = pd.Timestamp.now(tz='UTC') - pd.Timedelta(hours=48)
+    df = df[df['timestamp'] < cutoff_time]
+    dropped_count = initial_count - len(df)
+    if dropped_count > 0:
+        print(f"Dropped {dropped_count} rows with timestamp in the last 48 hours, remaining rows: {len(df)}")
+
+    # Show the range of dates after filtering
+    print(f"Timestamp range after filtering: {df['timestamp'].min()} to {df['timestamp'].max()}")
 
     return df
 

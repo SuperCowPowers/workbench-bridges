@@ -100,8 +100,8 @@ def apply_schema_transformations(df: pd.DataFrame) -> pd.DataFrame:
 
     # Remove rows where timestamp is within the last 48 hours
     initial_count = len(df)
-    cutoff_time = pd.Timestamp.now(tz='UTC') - pd.Timedelta(hours=48)
-    df = df[df['timestamp'] < cutoff_time]
+    cutoff_time = pd.Timestamp.now(tz="UTC") - pd.Timedelta(hours=48)
+    df = df[df["timestamp"] < cutoff_time]
     dropped_count = initial_count - len(df)
     if dropped_count > 0:
         print(f"Dropped {dropped_count} rows with timestamp in the last 48 hours, remaining rows: {len(df)}")

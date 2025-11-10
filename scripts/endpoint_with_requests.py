@@ -78,14 +78,14 @@ if __name__ == "__main__":
     # Note: We're using workbench here just to fetch the evaluation data
     #       You can replace this with your own data/dataframe
     from workbench.api.endpoint import Endpoint
-    from workbench.utils.endpoint_utils import fs_evaluation_data
+    from workbench.utils.endpoint_utils import get_evaluation_data
 
     endpoint = Endpoint(endpoint_name)
     if not endpoint.exists():
         raise ValueError(f"Endpoint {endpoint_name} does not exist.")
 
     # Fetch evaluation data
-    eval_df = fs_evaluation_data(endpoint)
+    eval_df = get_evaluation_data(endpoint)
 
     # Test CSV input and output
     print("Testing CSV request/response...")

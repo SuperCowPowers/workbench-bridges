@@ -164,7 +164,7 @@ if __name__ == "__main__":
     """Exercise the Endpoint Utilities"""
     import time
     from workbench.api.endpoint import Endpoint
-    from workbench.utils.endpoint_utils import fs_evaluation_data
+    from workbench.utils.endpoint_utils import get_evaluation_data
 
     # Grab the Endpoint
     my_endpoint_name = "abalone-regression"
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     # Pull evaluation data
     print("Pulling Evaluation Data...")
     sagemaker_session = my_endpoint.sm_session
-    my_eval_df = fs_evaluation_data(my_endpoint)
+    my_eval_df = get_evaluation_data(my_endpoint)
     start_time = time.time()
     my_results_df = fast_inference(my_endpoint_name, my_eval_df, sagemaker_session)
     end_time = time.time()

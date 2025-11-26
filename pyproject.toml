@@ -28,7 +28,7 @@ dependencies = [
     "boto3 >= 1.28.76",
     "botocore >= 1.31.76",
     "awswrangler >= 3.4.0",
-    "sagemaker >= 2.143",
+    "sagemaker >= 2.143, < 3.0",
     "requests >= 2.26.0"
 ]
 

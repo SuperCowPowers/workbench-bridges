@@ -5,6 +5,7 @@ from typing import Union
 import logging
 import awswrangler as wr
 import pandas as pd
+import os
 import re
 from urllib.parse import urlparse
 
@@ -37,39 +38,46 @@ class DFStore:
         ```
     """
 
-    def __init__(self, path_prefix: Union[str, None] = None):
+    def __init__(self, path_prefix: Union[str, None] = None, s3_bucket: Union[str, None] = None, boto3_session=None):
         """DFStore Init Method
 
         Args:
             path_prefix (Union[str, None], optional): Path prefix for storage locations (Defaults to None)
+            s3_bucket (Union[str, None], optional): S3 Bucket to use (Defaults to None, uses Workbench bucket)
+            boto3_session (optional): Boto3 session to use (Defaults to None, uses Workbench session)
         """
         self.log = logging.getLogger("workbench-bridges")
+
+        # Set up path prefix
         self._base_prefix = "df_store/"
-        self.path_prefix = self._base_prefix + path_prefix if path_prefix else self._base_prefix
-        self.path_prefix = re.sub(r"/+", "/", self.path_prefix)  # Collapse slashes
+        self.path_prefix = re.sub(r"/+", "/", self._base_prefix + (path_prefix or ""))
 
-        # Get the Workbench Bucket
-        param_key = "/workbench/config/workbench_bucket"
-        self.workbench_bucket = ParameterStore().get(param_key)
-        if self.workbench_bucket is None:
-            raise ValueError(f"Set '{param_key}' in Parameter Store.")
+        # Resolve bucket: explicit arg > env var > parameter store
+        self.workbench_bucket = (
+            s3_bucket or os.getenv("WORKBENCH_BUCKET") or ParameterStore().get("/workbench/config/workbench_bucket")
+        )
+        if not self.workbench_bucket:
+            raise ValueError(
+                "S3 bucket not found. Set WORKBENCH_BUCKET ENV or '/workbench/config/workbench_bucket' Parameter Store."
+            )
 
-        # Grab a Workbench Session (this allows us to assume the Workbench ExecutionRole)
-        self.boto3_session = get_sagemaker_session().boto_session
-
-        # Get the S3 Client
+        # Set up boto3 session and S3 client
+        self.boto3_session = boto3_session or get_sagemaker_session().boto_session
         self.s3_client = self.boto3_session.client("s3")
 
-    def list(self, include_cache: bool = False) -> list:
+    def list(self, prefix: str = None, include_cache: bool = False) -> list:
         """List all objects in the data_store prefix
 
         Args:
+            prefix (str, optional): Only include objects with the given prefix
             include_cache (bool, optional): Include cache objects in the list (Defaults to False)
 
         Returns:
             list: A list of all the objects in the data_store prefix.
         """
         df = self.summary(include_cache=include_cache)
+        if prefix:
+            df = df[df["location"].str.startswith(prefix)]
         return df["location"].tolist()
 
     def last_modified(self, location: str) -> Union[datetime, None]:
@@ -256,32 +264,6 @@ class DFStore:
         except Exception as e:
             self.log.error(f"Failed to delete data recursively at '{location}': {e}")
 
-    def list_subfiles(self, prefix: str) -> list:
-        """Return a list of file locations with the given prefix.
-
-        Args:
-            prefix (str, optional): Only include files with the given prefix
-
-        Returns:
-            list: List of file locations (paths)
-        """
-        try:
-            full_prefix = f"{self.path_prefix}{prefix.lstrip('/')}"
-            response = self.s3_client.list_objects_v2(Bucket=self.workbench_bucket, Prefix=full_prefix)
-            if "Contents" not in response:
-                return []
-
-            locations = []
-            for obj in response["Contents"]:
-                full_key = obj["Key"]
-                location = full_key.replace(f"{self.path_prefix}", "/").split(".parquet")[0]
-                locations.append(location)
-            return locations
-
-        except Exception as e:
-            self.log.error(f"Failed to list subfiles: {e}")
-            return []
-
     def _generate_s3_uri(self, location: str) -> str:
         """Generate the S3 URI for the given location."""
         s3_path = f"{self.workbench_bucket}/{self.path_prefix}/{location}.parquet"
@@ -372,9 +354,9 @@ if __name__ == "__main__":
     print(df_store.check("/testing/test_data"))
     print("--- Check %s seconds ---" % (time.time() - start_time))
 
-    # Test list_subfiles
-    print("List Subfiles:")
-    print(df_store.list_subfiles("/testing"))
+    # Test list with a prefix
+    print("List with prefix:")
+    print(df_store.list("/testing"))
 
     # Now delete the test data
     df_store.delete("/testing/test_data")

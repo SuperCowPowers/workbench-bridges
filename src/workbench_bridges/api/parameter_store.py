@@ -252,6 +252,9 @@ class ParameterStore:
         Args:
             prefix (str): The prefix of the parameters to delete.
         """
+        # Make sure prefix ends with a slash
+        if not prefix.endswith("/"):
+            prefix += "/"
         # List all parameters with the given prefix
         parameters = self.list(prefix=prefix)
         for param in parameters:
@@ -295,8 +298,13 @@ if __name__ == "__main__":
     print(param_store.list("/workbench"))
 
     # Delete the parameters
-    param_store.delete("/workbench/test")
     param_store.delete("/workbench/my_data")
+
+    # Delete recursively
+    param_store.upsert("/workbench/test/test1", "value")
+    param_store.upsert("/workbench/test/test2", "value")
+    param_store.upsert("/workbench/test/test3", "value")
+    param_store.delete_recursive("/workbench/test")
 
     # Out of scope tests
     param_store.upsert("test", "value")

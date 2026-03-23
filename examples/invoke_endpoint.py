@@ -5,7 +5,6 @@ import pandas as pd
 # Workbench-Bridges Imports
 from workbench_bridges.endpoints.fast_inference import fast_inference
 
-
 if __name__ == "__main__":
 
     # Check if we have local data

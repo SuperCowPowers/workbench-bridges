@@ -8,7 +8,6 @@ import requests
 from contextlib import contextmanager
 from importlib.metadata import version
 
-
 # Define IMPORTANT level
 # Note: see https://docs.python.org/3/library/logging.html#logging-levels
 IMPORTANT_LEVEL_NUM = 25  # Between INFO and WARNING

@@ -4,7 +4,6 @@ from typing import Callable, Optional
 import awswrangler as wr
 from botocore.exceptions import ClientError
 
-
 # Workbench-Bridges Logger
 log = logging.getLogger("workbench-bridges")
 

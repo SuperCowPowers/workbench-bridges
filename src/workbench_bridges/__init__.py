@@ -6,6 +6,7 @@ Workbench Bridges
   - TBD1
   - TBD2
 """
+
 from importlib.metadata import version
 
 try:

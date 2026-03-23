@@ -74,7 +74,7 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
         try:
             response = predictor.predict(csv_buffer.getvalue())
         except Exception as e:
-            log.error(f"Error during prediction: {e}")
+            log.error(f"Error during prediction on '{endpoint_name}': {e}")
             return pd.DataFrame()
         # CSVDeserializer returns a nested list: first row is headers
         return pd.DataFrame.from_records(response[1:], columns=response[0])
@@ -96,8 +96,7 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
     df_list = [df for df in df_list if not df.empty]
 
     if not df_list:
-        log.error("All prediction chunks failed")
-        return pd.DataFrame()
+        raise RuntimeError(f"All prediction chunks failed for endpoint '{endpoint_name}'")
 
     combined_df = pd.concat(df_list, ignore_index=True)
 

@@ -39,6 +39,9 @@ Homepage = "https://github.com/SuperCowPowers/workbench-bridges"
 package-dir = {"" = "src"}
 packages = { find = { where = ["src"] } }
 
+[tool.black]
+line-length = 120
+
 [tool.flake8]
 max-line-length = 120
 extend-ignore = ["E203"]

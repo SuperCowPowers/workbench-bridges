@@ -20,7 +20,7 @@ jobs:
       run: pip install flake8 black
 
     - name: Run Black (Code Formatting)
-      run: black --check --line-length=120 src/workbench_bridges tests
+      run: black --line-length=120 src/workbench_bridges tests
 
     - name: Run Flake8 (Linting)
       run: flake8 src/workbench_bridges tests

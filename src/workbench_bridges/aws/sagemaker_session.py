@@ -1,7 +1,7 @@
 """Get an AWS SageMaker Session"""
 
 import boto3
-import sagemaker
+from sagemaker.core.helper.session_helper import Session as SageSession
 import logging
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
@@ -12,9 +12,9 @@ from workbench_bridges.utils.execution_environment import running_as_service
 log = logging.getLogger("workbench-bridges")
 
 
-def get_sagemaker_session() -> sagemaker.Session:
+def get_sagemaker_session() -> SageSession:
     # Create initial SageMaker session
-    session = sagemaker.Session()
+    session = SageSession()
     # Only assume Workbench role when running locally (not as a service)
     if not running_as_service():
         role = "Workbench-ExecutionRole"

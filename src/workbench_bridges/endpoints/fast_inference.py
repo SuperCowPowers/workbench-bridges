@@ -8,10 +8,19 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Sagemaker Imports
 import boto3
-import sagemaker
-from sagemaker.serializers import CSVSerializer
-from sagemaker.deserializers import CSVDeserializer
-from sagemaker import Predictor
+from sagemaker.core.helper.session_helper import Session as SageSession
+from sagemaker.core.resources import Endpoint as SagemakerEndpoint
+from sagemaker.core.serializers import CSVSerializer
+from sagemaker.core.deserializers import PandasDeserializer
+
+
+class WorkbenchDeserializer(PandasDeserializer):
+    """PandasDeserializer that handles 'text/csv; charset=utf-8' content types."""
+
+    def deserialize(self, stream, content_type):
+        base_content_type = content_type.split(";")[0].strip()
+        return super().deserialize(stream, base_content_type)
+
 
 log = logging.getLogger("workbench-bridges")
 
@@ -35,7 +44,7 @@ def get_or_create_sm_session():
     if _CACHED_SM_SESSION is None:
         region = get_aws_region()
         print(f"Creating new SageMaker session in region: {region}")
-        _CACHED_SM_SESSION = sagemaker.Session(boto3.Session(region_name=region))
+        _CACHED_SM_SESSION = SageSession(boto3.Session(region_name=region))
     return _CACHED_SM_SESSION
 
 
@@ -55,12 +64,10 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
     if sm_session is None:
         sm_session = get_or_create_sm_session()
 
-    predictor = Predictor(
-        endpoint_name,
-        sagemaker_session=sm_session,
-        serializer=CSVSerializer(),
-        deserializer=CSVDeserializer(),
-    )
+    # Get the SageMaker Endpoint object with CSV in / DataFrame out
+    sm_endpoint = SagemakerEndpoint.get(endpoint_name, session=sm_session.boto_session)
+    sm_endpoint.serializer = CSVSerializer()
+    sm_endpoint.deserializer = WorkbenchDeserializer()
 
     total_rows = len(eval_df)
 
@@ -72,12 +79,11 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
         csv_buffer = StringIO()
         chunk_df.to_csv(csv_buffer, index=False)
         try:
-            response = predictor.predict(csv_buffer.getvalue())
+            response = sm_endpoint.invoke(body=csv_buffer.getvalue(), content_type="text/csv", accept="text/csv")
+            return response.body  # PandasDeserializer returns a DataFrame directly
         except Exception as e:
             log.error(f"Error during prediction on '{endpoint_name}': {e}")
             return pd.DataFrame()
-        # CSVDeserializer returns a nested list: first row is headers
-        return pd.DataFrame.from_records(response[1:], columns=response[0])
 
     # Sagemaker has a connection pool limit of 10
     if threads > 10:

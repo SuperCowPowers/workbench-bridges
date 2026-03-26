@@ -1,18 +1,18 @@
-"""Tests for the AWS Account Stuff"""
+"""Tests for the AWS Session"""
 
 # Workbench-Bridge Imports
-from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
+from workbench_bridges.aws.sagemaker_session import get_boto3_session
 
 
-def test_sagemaker_session():
-    """Tests for the AWS Account Stuff"""
+def test_boto3_session():
+    """Tests for the AWS boto3 session and SageMaker client access"""
 
-    # Get SageMaker Session
-    sagemaker_session = get_sagemaker_session()
+    # Get boto3 Session
+    boto3_session = get_boto3_session()
 
     # List SageMaker Models
     print("\nSageMaker Models:")
-    sagemaker_client = sagemaker_session.sagemaker_client
+    sagemaker_client = boto3_session.client("sagemaker")
     response = sagemaker_client.list_models()
 
     for model in response["Models"]:
@@ -20,4 +20,4 @@ def test_sagemaker_session():
 
 
 if __name__ == "__main__":
-    test_sagemaker_session()
+    test_boto3_session()

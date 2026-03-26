@@ -7,7 +7,7 @@ import pandas as pd
 import awswrangler as wr
 
 # Workbench-Bridges Imports
-from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
+from workbench_bridges.aws.sagemaker_session import get_boto3_session
 from workbench_bridges.api.parameter_store import ParameterStore
 
 log = logging.getLogger("workbench-bridges")
@@ -121,8 +121,7 @@ def dataframe_to_table(df: pd.DataFrame, database: str, table_name: str, mode: s
         mode (str): The mode to use when storing the DataFrame (default: "append")
     """
     log.info("Assuming Workbench Execution Role...")
-    sagemaker_session = get_sagemaker_session()
-    boto3_session = sagemaker_session.boto_session
+    boto3_session = get_boto3_session()
 
     # Get the Workbench Bucket
     param_key = "/workbench/config/workbench_bucket"
@@ -163,8 +162,7 @@ def delete_table(table_name: str, database: str, include_s3_files: bool = True):
         include_s3_files (bool): Whether to delete the S3 files associated with the table
     """
     log.info("Assuming Workbench Execution Role...")
-    sagemaker_session = get_sagemaker_session()
-    boto3_session = sagemaker_session.boto_session
+    boto3_session = get_boto3_session()
 
     # Get the Workbench Bucket
     param_key = "/workbench/config/workbench_bucket"
@@ -212,7 +210,7 @@ if __name__ == "__main__":
     print(f"DataFrame stored as Glue table 'test_table' in database '{my_catalog_db}'.")
 
     print("Listing Tables...")
-    my_boto3_session = get_sagemaker_session().boto_session
+    my_boto3_session = get_boto3_session()
     print(list(wr.catalog.get_tables(database=my_catalog_db, boto3_session=my_boto3_session)))
 
     # Delete the table

@@ -6,25 +6,12 @@ from io import StringIO
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-# Sagemaker Imports
 import boto3
-from sagemaker.core.helper.session_helper import Session as SageSession
-from sagemaker.core.resources import Endpoint as SagemakerEndpoint
-from sagemaker.core.serializers import CSVSerializer
-from sagemaker.core.deserializers import PandasDeserializer
-
-
-class WorkbenchDeserializer(PandasDeserializer):
-    """PandasDeserializer that handles 'text/csv; charset=utf-8' content types."""
-
-    def deserialize(self, stream, content_type):
-        base_content_type = content_type.split(";")[0].strip()
-        return super().deserialize(stream, base_content_type)
-
 
 log = logging.getLogger("workbench-bridges")
 
-_CACHED_SM_SESSION = None
+_CACHED_SM_CLIENT = None
+_CACHED_REGION = None
 
 
 def get_aws_region():
@@ -39,13 +26,14 @@ def get_aws_region():
     return region
 
 
-def get_or_create_sm_session():
-    global _CACHED_SM_SESSION
-    if _CACHED_SM_SESSION is None:
-        region = get_aws_region()
-        print(f"Creating new SageMaker session in region: {region}")
-        _CACHED_SM_SESSION = SageSession(boto3.Session(region_name=region))
-    return _CACHED_SM_SESSION
+def get_or_create_sm_client():
+    """Get or create a cached SageMaker Runtime client."""
+    global _CACHED_SM_CLIENT, _CACHED_REGION
+    if _CACHED_SM_CLIENT is None:
+        _CACHED_REGION = get_aws_region()
+        print(f"Creating new SageMaker Runtime client in region: {_CACHED_REGION}")
+        _CACHED_SM_CLIENT = boto3.Session(region_name=_CACHED_REGION).client("sagemaker-runtime")
+    return _CACHED_SM_CLIENT
 
 
 def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, threads: int = 4) -> pd.DataFrame:
@@ -54,20 +42,19 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
     Args:
         endpoint_name (str): The name of the Endpoint
         eval_df (pd.DataFrame): The DataFrame to run predictions on
-        sm_session (sagemaker.session.Session, optional): SageMaker Session. If None, a cached session is created.
+        sm_session: A boto3 Session (or legacy SageMaker Session with .boto_session). If None, a cached client is used.
         threads (int): The number of threads to use (default: 4)
 
     Returns:
         pd.DataFrame: The DataFrame with predictions
     """
-    # Use cached session if none is provided
-    if sm_session is None:
-        sm_session = get_or_create_sm_session()
-
-    # Get the SageMaker Endpoint object with CSV in / DataFrame out
-    sm_endpoint = SagemakerEndpoint.get(endpoint_name, session=sm_session.boto_session)
-    sm_endpoint.serializer = CSVSerializer()
-    sm_endpoint.deserializer = WorkbenchDeserializer()
+    # Build the sagemaker-runtime client
+    if sm_session is not None:
+        # Support both plain boto3.Session and legacy SageMaker Session objects
+        boto_session = getattr(sm_session, "boto_session", sm_session)
+        sm_runtime = boto_session.client("sagemaker-runtime")
+    else:
+        sm_runtime = get_or_create_sm_client()
 
     total_rows = len(eval_df)
 
@@ -79,8 +66,16 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
         csv_buffer = StringIO()
         chunk_df.to_csv(csv_buffer, index=False)
         try:
-            response = sm_endpoint.invoke(body=csv_buffer.getvalue(), content_type="text/csv", accept="text/csv")
-            return response.body  # PandasDeserializer returns a DataFrame directly
+            response = sm_runtime.invoke_endpoint(
+                EndpointName=endpoint_name,
+                Body=csv_buffer.getvalue(),
+                ContentType="text/csv",
+                Accept="text/csv",
+            )
+            # Read the response body and parse as CSV into a DataFrame
+            response_body = response["Body"].read().decode("utf-8")
+            # Handle 'charset' in content type (e.g. 'text/csv; charset=utf-8')
+            return pd.read_csv(StringIO(response_body))
         except Exception as e:
             log.error(f"Error during prediction on '{endpoint_name}': {e}")
             return pd.DataFrame()

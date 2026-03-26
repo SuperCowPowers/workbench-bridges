@@ -134,8 +134,8 @@ def logging_setup(color_logs=True):
     else:
         log.setLevel(logging.INFO)
 
-    # Suppress specific logger
-    logging.getLogger("sagemaker.config").setLevel(logging.WARNING)
+    # Suppress noisy loggers
+    logging.getLogger("botocore").setLevel(logging.WARNING)
 
 
 @contextmanager

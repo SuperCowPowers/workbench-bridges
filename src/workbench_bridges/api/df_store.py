@@ -10,7 +10,7 @@ import re
 from urllib.parse import urlparse
 
 # Workbench Bridges Imports
-from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
+from workbench_bridges.aws.sagemaker_session import get_boto3_session
 from workbench_bridges.api.parameter_store import ParameterStore
 from workbench_bridges.utils.aws_utils import not_found_returns_none
 
@@ -62,7 +62,7 @@ class DFStore:
             )
 
         # Set up boto3 session and S3 client
-        self.boto3_session = boto3_session or get_sagemaker_session().boto_session
+        self.boto3_session = boto3_session or get_boto3_session()
         self.s3_client = self.boto3_session.client("s3")
 
     def list(self, prefix: str = None, include_cache: bool = False) -> list:

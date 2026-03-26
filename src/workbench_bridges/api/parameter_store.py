@@ -9,7 +9,7 @@ import base64
 from botocore.exceptions import ClientError
 
 # Workbench-Bridges Imports
-from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
+from workbench_bridges.aws.sagemaker_session import get_boto3_session
 from workbench_bridges.utils.json_utils import CustomEncoder
 
 
@@ -59,7 +59,7 @@ class ParameterStore:
         if boto3_session:
             self.boto3_session = boto3_session
         else:
-            self.boto3_session = get_sagemaker_session().boto_session
+            self.boto3_session = get_boto3_session()
 
         # Create a Systems Manager (SSM) client for Parameter Store operations
         self.ssm_client = self.boto3_session.client("ssm")

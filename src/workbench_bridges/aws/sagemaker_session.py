@@ -1,7 +1,6 @@
-"""Get an AWS SageMaker Session"""
+"""Get an AWS Boto3 Session (with optional Workbench role assumption)"""
 
 import boto3
-from sagemaker.core.helper.session_helper import Session as SageSession
 import logging
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
@@ -12,19 +11,24 @@ from workbench_bridges.utils.execution_environment import running_as_service
 log = logging.getLogger("workbench-bridges")
 
 
-def get_sagemaker_session() -> SageSession:
-    # Create initial SageMaker session
-    session = SageSession()
+def get_boto3_session() -> boto3.Session:
+    """Get a boto3 session, optionally assuming the Workbench execution role.
+
+    Returns:
+        boto3.Session: A boto3 session (with assumed role credentials when running locally).
+    """
+    session = boto3.Session()
+
     # Only assume Workbench role when running locally (not as a service)
     if not running_as_service():
         role = "Workbench-ExecutionRole"
-        account_id = session.boto_session.client("sts").get_caller_identity()["Account"]
         try:
-            assumed_role = boto3.client("sts").assume_role(
+            account_id = session.client("sts").get_caller_identity()["Account"]
+            assumed_role = session.client("sts").assume_role(
                 RoleArn=f"arn:aws:iam::{account_id}:role/{role}", RoleSessionName="WorkbenchSession"
             )
             credentials = assumed_role["Credentials"]
-            session.boto_session = boto3.Session(
+            session = boto3.Session(
                 aws_access_key_id=credentials["AccessKeyId"],
                 aws_secret_access_key=credentials["SecretAccessKey"],
                 aws_session_token=credentials["SessionToken"],
@@ -38,23 +42,22 @@ def get_sagemaker_session() -> SageSession:
 if __name__ == "__main__":
     from workbench_bridges.api.parameter_store import ParameterStore
 
-    # Get SageMaker Session
-    sagemaker_session = get_sagemaker_session()
+    # Get a boto3 session
+    boto3_session = get_boto3_session()
 
     # List SageMaker Models
     print("\nSageMaker Models:")
-    sagemaker_client = sagemaker_session.sagemaker_client
+    sagemaker_client = boto3_session.client("sagemaker")
     response = sagemaker_client.list_models()
 
     for model in response["Models"]:
         print(model["ModelName"])
 
-    # Get the boto3 session and list objects in the Workbench Bucket
+    # List objects in the Workbench Bucket
     param_key = "/workbench/config/workbench_bucket"
     workbench_bucket = ParameterStore().get(param_key)
     if workbench_bucket is None:
         raise ValueError(f"Set '{param_key}' in Parameter Store.")
-    boto3_session = sagemaker_session.boto_session
     s3_client = boto3_session.client("s3")
     try:
         response = s3_client.list_objects_v2(Bucket=workbench_bucket, MaxKeys=10)

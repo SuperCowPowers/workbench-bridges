@@ -6,7 +6,7 @@ import pandas as pd
 import awswrangler as wr
 
 # Workbench Bridges Imports
-from workbench_bridges.aws.sagemaker_session import get_sagemaker_session
+from workbench_bridges.aws.sagemaker_session import get_boto3_session
 from workbench_bridges.utils.athena_utils import (
     dataframe_to_table,
     table_s3_path,
@@ -34,7 +34,7 @@ class InferenceStore:
         self.log = logging.getLogger("workbench-bridges")
         self.catalog_db = catalog_db
         self.table_name = table_name
-        self.boto3_session = get_sagemaker_session().boto_session
+        self.boto3_session = get_boto3_session()
         self.schema = ["id", "model", "pred_label", "pred_value", "tags", "meta", "timestamp"]
 
         # Ensure the Table exists

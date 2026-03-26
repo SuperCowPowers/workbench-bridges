@@ -1,12 +1,9 @@
 import os
 import sys
-import re
 import time
 import logging
 import traceback
-import requests
 from contextlib import contextmanager
-from importlib.metadata import version
 
 # Define IMPORTANT level
 # Note: see https://docs.python.org/3/library/logging.html#logging-levels
@@ -64,31 +61,6 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record):
         log_message = super().format(record)
         return f"{self.COLORS.get(record.levelname, self.RESET)}{log_message}{self.RESET}"
-
-
-def check_latest_version(log: logging.Logger):
-    """Check if the current version of Workbench is up-to-date."""
-
-    # Get the raw version and strip and Git metadata like '.dev1' or '+dirty'
-    raw_version = version("workbench_bridges")
-    current_version = re.sub(r"\.dev\d+|\+dirty", "", raw_version)
-    current_version_tuple = tuple(map(int, (current_version.split("."))))
-
-    try:
-        response = requests.get("https://pypi.org/pypi/workbench/json", timeout=5)
-        response.raise_for_status()  # Raises an exception for 4xx/5xx responses
-        latest_version = response.json()["info"]["version"]
-        latest_version_tuple = tuple(map(int, (latest_version.split("."))))
-
-        # Compare the current version to the latest version
-        if current_version_tuple >= latest_version_tuple:
-            log.important(f"Workbench Bridges Version: {raw_version}")
-        else:
-            log.important(f"Workbench Bridges Version: {raw_version}")
-            log.warning(f"Workbench Bridges update available: {current_version} -> {latest_version}")
-
-    except requests.exceptions.RequestException as e:
-        log.warning(f"Failed to check for updates: {e}")
 
 
 def logging_setup(color_logs=True):

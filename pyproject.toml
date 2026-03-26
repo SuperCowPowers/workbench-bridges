@@ -46,8 +46,14 @@ max-line-length = 120
 extend-ignore = ["E203"]
 
 [tool.pytest.ini_options]
-addopts = "-v --cov-report term-missing"
+addopts = "-v --cov=workbench_bridges --cov-report term-missing"
 python_files = "*.py"
 python_functions = "test"
 norecursedirs = [".tox", ".git", "*.egg-info", "__pycache__", "dist", "build"]
 markers = ["long: marks tests as long (deselect with '-m \"not long\"')"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.",
+    "pragma: no cover",
+]

@@ -1,7 +1,6 @@
 """Athena Utils: Utility functions for AWS Athena."""
 
 import os
-import re
 import logging
 import pandas as pd
 import awswrangler as wr
@@ -11,77 +10,6 @@ from workbench_bridges.aws.sagemaker_session import get_boto3_session
 from workbench_bridges.api.parameter_store import ParameterStore
 
 log = logging.getLogger("workbench-bridges")
-
-
-def sanitize_columns_for_athena(df):
-    """
-    Sanitize DataFrame column names for Athena compatibility.
-
-    Rules:
-    - Lowercase only
-    - Replace spaces/special chars with underscores
-    - Remove consecutive underscores
-    - Strip leading/trailing underscores
-    - Handle reserved words by adding suffix
-    """
-    # Athena reserved words (partial list - add more as needed)
-    RESERVED_WORDS = {
-        "select",
-        "from",
-        "where",
-        "group",
-        "order",
-        "by",
-        "having",
-        "limit",
-        "offset",
-        "union",
-        "join",
-        "inner",
-        "left",
-        "right",
-        "on",
-        "as",
-        "and",
-        "or",
-        "not",
-        "in",
-        "like",
-        "between",
-        "date",
-        "time",
-        "interval",
-        "case",
-        "when",
-        "then",
-    }
-
-    new_columns = []
-    for col in df.columns:
-        # Convert to lowercase
-        new_col = str(col).lower()
-
-        # Replace spaces and special chars with underscores
-        new_col = re.sub(r"[^\w]", "_", new_col)
-
-        # Remove consecutive underscores
-        new_col = re.sub(r"_+", "_", new_col)
-
-        # Strip leading/trailing underscores
-        new_col = new_col.strip("_")
-
-        # Handle reserved words
-        if new_col in RESERVED_WORDS:
-            new_col += "_col"
-
-        new_columns.append(new_col)
-
-    # Report any columns that were modified
-    modified_columns = [col for col in df.columns if col != new_columns[df.columns.get_loc(col)]]
-    if modified_columns:
-        log.warning(f"Modified columns for Athena compatibility: {modified_columns}")
-
-    return df.rename(columns=dict(zip(df.columns, new_columns)))
 
 
 def table_s3_path(database: str, table_name: str) -> str:

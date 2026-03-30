@@ -3,14 +3,17 @@
 - ParameterStore: Manages AWS Parameter Store
 - InferenceStore: Manages Athena based storage for inference results
 - DFStore: Manages DataFrames in AWS S3
+- PublicData: Read-only access to public S3 data
 """
 
 from .parameter_store import ParameterStore
 from .inference_store import InferenceStore
 from .df_store import DFStore
+from .public_data import PublicData
 
 __all__ = [
     "ParameterStore",
     "InferenceStore",
     "DFStore",
+    "PublicData",
 ]

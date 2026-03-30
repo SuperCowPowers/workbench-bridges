@@ -93,8 +93,13 @@ def test_colored_formatter():
     """Test ColoredFormatter applies colors"""
     formatter = ColoredFormatter("%(levelname)s %(message)s")
     record = logging.LogRecord(
-        name="test", level=logging.INFO, pathname="", lineno=0,
-        msg="hello", args=(), exc_info=None,
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="hello",
+        args=(),
+        exc_info=None,
     )
     result = formatter.format(record)
     # Should contain ANSI escape codes
@@ -108,8 +113,13 @@ def test_colored_formatter_all_levels():
     for level_name in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
         level = getattr(logging, level_name)
         record = logging.LogRecord(
-            name="test", level=level, pathname="", lineno=0,
-            msg="test", args=(), exc_info=None,
+            name="test",
+            level=level,
+            pathname="",
+            lineno=0,
+            msg="test",
+            args=(),
+            exc_info=None,
         )
         result = formatter.format(record)
         assert "test" in result

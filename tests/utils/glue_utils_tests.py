@@ -55,12 +55,17 @@ def test_glue_style_args():
     args = [
         "/tmp/dispatch_test.py",
         "true",
-        "--s3path", "s3://blah/foo.csv",
-        "--job-bookmark-option", "job-bookmark-disable",
-        "--JOB_ID", "j_a123",
+        "--s3path",
+        "s3://blah/foo.csv",
+        "--job-bookmark-option",
+        "job-bookmark-disable",
+        "--JOB_ID",
+        "j_a123",
         "true",
-        "--JOB_RUN_ID", "jr_z456",
-        "--JOB_NAME", "dispatch_test",
+        "--JOB_RUN_ID",
+        "jr_z456",
+        "--JOB_NAME",
+        "dispatch_test",
     ]
     result = get_resolved_options(args)
     assert result["s3path"] == "s3://blah/foo.csv"

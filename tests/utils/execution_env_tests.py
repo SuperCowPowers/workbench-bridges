@@ -49,8 +49,13 @@ def test_running_on_lambda_true():
 
 def test_running_on_ecs_false():
     """Test that ECS detection returns False locally"""
-    for key in ["ECS_SERVICE_NAME", "ECS_CONTAINER_METADATA_URI", "ECS_CONTAINER_METADATA_URI_V4",
-                "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_EXECUTION_ENV"]:
+    for key in [
+        "ECS_SERVICE_NAME",
+        "ECS_CONTAINER_METADATA_URI",
+        "ECS_CONTAINER_METADATA_URI_V4",
+        "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+        "AWS_EXECUTION_ENV",
+    ]:
         os.environ.pop(key, None)
     assert running_on_ecs() is False
 
@@ -65,17 +70,29 @@ def test_running_on_ecs_true():
 def test_running_on_docker_false():
     """Test that docker detection returns False on dev machine"""
     # Clean up ECS env vars that would trigger docker detection
-    for key in ["ECS_SERVICE_NAME", "ECS_CONTAINER_METADATA_URI", "ECS_CONTAINER_METADATA_URI_V4",
-                "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_EXECUTION_ENV"]:
+    for key in [
+        "ECS_SERVICE_NAME",
+        "ECS_CONTAINER_METADATA_URI",
+        "ECS_CONTAINER_METADATA_URI_V4",
+        "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+        "AWS_EXECUTION_ENV",
+    ]:
         os.environ.pop(key, None)
     assert running_on_docker() is False
 
 
 def test_running_as_service_false():
     """Test that service detection returns False locally"""
-    for key in ["GLUE_VERSION", "GLUE_PYTHON_VERSION", "AWS_LAMBDA_FUNCTION_NAME",
-                "ECS_SERVICE_NAME", "ECS_CONTAINER_METADATA_URI", "ECS_CONTAINER_METADATA_URI_V4",
-                "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_EXECUTION_ENV"]:
+    for key in [
+        "GLUE_VERSION",
+        "GLUE_PYTHON_VERSION",
+        "AWS_LAMBDA_FUNCTION_NAME",
+        "ECS_SERVICE_NAME",
+        "ECS_CONTAINER_METADATA_URI",
+        "ECS_CONTAINER_METADATA_URI_V4",
+        "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+        "AWS_EXECUTION_ENV",
+    ]:
         os.environ.pop(key, None)
     assert running_as_service() is False
 

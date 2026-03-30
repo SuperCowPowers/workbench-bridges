@@ -1,6 +1,7 @@
 """PublicData: Read-only access to public S3 data (comp_chem datasets)"""
 
-from typing import Union
+from typing import Union, Optional
+import json
 import logging
 import awswrangler as wr
 import pandas as pd
@@ -80,8 +81,9 @@ class PublicData:
         for ext, reader in [(".parquet", wr.s3.read_parquet), (".csv", wr.s3.read_csv)]:
             s3_uri = f"s3://{self.BUCKET}/{self.PREFIX}{name}{ext}"
             try:
+                df = reader(s3_uri, boto3_session=self.boto3_session)
                 self.log.info(f"Reading {s3_uri}...")
-                return reader(s3_uri, boto3_session=self.boto3_session)
+                return df
             except wr.exceptions.NoFilesFound:
                 continue
 
@@ -111,6 +113,52 @@ class PublicData:
                 )
 
         return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["name", "size (MB)", "modified"])
+
+    def describe(self, name: str) -> Optional[dict]:
+        """Return a description of a dataset including source references.
+
+        Looks up the dataset in the descriptions.json file stored alongside
+        the data in S3 (s3://<bucket>/<prefix>descriptions.json).
+
+        Args:
+            name: Dataset filename (e.g. "logp_all.csv") or dataset name
+                  without extension (e.g. "logp_all").
+
+        Returns:
+            dict with description, column info, references, etc., or None if not found.
+        """
+        # Load descriptions from S3 (cached after first call)
+        if not hasattr(self, "_descriptions"):
+            self._descriptions = self._load_descriptions()
+
+        # Build candidate keys: exact, with extensions, and basename variants
+        import posixpath
+
+        basename = posixpath.basename(name)
+        # Strip extension from basename if present
+        stem = basename
+        for ext in (".parquet", ".csv", ".json"):
+            if stem.endswith(ext):
+                stem = stem[: -len(ext)]
+                break
+
+        candidates = [name, basename, stem, f"{stem}.csv", f"{stem}.parquet", f"{basename}.csv", f"{basename}.parquet"]
+        for key in candidates:
+            if key in self._descriptions:
+                return self._descriptions[key]
+
+        self.log.info(f"No description found for '{name}'")
+        return None
+
+    def _load_descriptions(self) -> dict:
+        """Load descriptions.json from S3."""
+        s3_key = f"{self.PREFIX}descriptions.json"
+        try:
+            resp = self.s3_client.get_object(Bucket=self.BUCKET, Key=s3_key)
+            return json.loads(resp["Body"].read().decode("utf-8"))
+        except Exception as e:
+            self.log.info(f"Could not load descriptions from s3://{self.BUCKET}/{s3_key}: {e}")
+            return {}
 
     def __repr__(self):
         """Return a string representation of the PublicData object."""

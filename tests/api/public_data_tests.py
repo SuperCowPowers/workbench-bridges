@@ -78,9 +78,9 @@ def test_no_awswrangler_config_pollution():
 
     # Verify config is unchanged
     config_after = wr.config.botocore_config
-    assert config_before == config_after, (
-        f"PublicData.get() modified wr.config.botocore_config: {config_before} -> {config_after}"
-    )
+    assert (
+        config_before == config_after
+    ), f"PublicData.get() modified wr.config.botocore_config: {config_before} -> {config_after}"
 
 
 if __name__ == "__main__":

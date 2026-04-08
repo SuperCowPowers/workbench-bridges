@@ -1,9 +1,9 @@
 """PublicData: Read-only access to public S3 data (comp_chem datasets)"""
 
 from typing import Union, Optional
+from io import BytesIO
 import json
 import logging
-import awswrangler as wr
 import pandas as pd
 import boto3
 from botocore import UNSIGNED
@@ -23,14 +23,13 @@ class PublicData:
         public_data.list()
 
         # Get a specific dataset
-        df = public_data.get("aqsol/aqsol_public_data")
+        df = public_data.get("comp_chem/aqsol/aqsol_public_data")
         print(df)
         ```
     """
 
-    # Public bucket and prefix
+    # Public bucket
     BUCKET = "workbench-public-data"
-    PREFIX = "comp_chem/"
 
     def __init__(self):
         """PublicData Init Method"""
@@ -49,13 +48,13 @@ class PublicData:
         """
         datasets = []
         paginator = self.s3_client.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=self.BUCKET, Prefix=self.PREFIX):
+        for page in paginator.paginate(Bucket=self.BUCKET):
             for obj in page.get("Contents", []):
                 key = obj["Key"]
-                if key == self.PREFIX or obj["Size"] == 0:
+                if obj["Size"] == 0:
                     continue
-                name = key[len(self.PREFIX) :]
                 # Strip file extensions (.csv, .parquet, etc.)
+                name = key
                 for ext in (".parquet", ".csv", ".json"):
                     if name.endswith(ext):
                         name = name[: -len(ext)]
@@ -74,17 +73,14 @@ class PublicData:
         Returns:
             pd.DataFrame: The retrieved DataFrame or None if not found.
         """
-        # Set unsigned config for awswrangler
-        wr.config.botocore_config = self.unsigned_config
-
-        # Try parquet first, then csv
-        for ext, reader in [(".parquet", wr.s3.read_parquet), (".csv", wr.s3.read_csv)]:
-            s3_uri = f"s3://{self.BUCKET}/{self.PREFIX}{name}{ext}"
+        readers = {".parquet": pd.read_parquet, ".csv": pd.read_csv}
+        for ext, reader in readers.items():
+            key = f"{name}{ext}"
             try:
-                df = reader(s3_uri, boto3_session=self.boto3_session)
-                self.log.info(f"Reading {s3_uri}...")
-                return df
-            except wr.exceptions.NoFilesFound:
+                resp = self.s3_client.get_object(Bucket=self.BUCKET, Key=key)
+                self.log.info(f"Reading s3://{self.BUCKET}/{key}...")
+                return reader(BytesIO(resp["Body"].read()))
+            except self.s3_client.exceptions.NoSuchKey:
                 continue
 
         self.log.warning(f"Dataset '{name}' not found in public data store.")
@@ -98,15 +94,14 @@ class PublicData:
         """
         rows = []
         paginator = self.s3_client.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=self.BUCKET, Prefix=self.PREFIX):
+        for page in paginator.paginate(Bucket=self.BUCKET):
             for obj in page.get("Contents", []):
                 key = obj["Key"]
-                if key == self.PREFIX or obj["Size"] == 0:
+                if obj["Size"] == 0:
                     continue
-                name = key[len(self.PREFIX) :]
                 rows.append(
                     {
-                        "name": name,
+                        "name": key,
                         "size (MB)": round(obj["Size"] / (1024 * 1024), 2),
                         "modified": obj["LastModified"].strftime("%Y-%m-%d %H:%M:%S"),
                     }
@@ -117,12 +112,8 @@ class PublicData:
     def describe(self, name: str) -> Optional[dict]:
         """Return a description of a dataset including source references.
 
-        Looks up the dataset in the descriptions.json file stored alongside
-        the data in S3 (s3://<bucket>/<prefix>descriptions.json).
-
         Args:
-            name: Dataset filename (e.g. "logp_all.csv") or dataset name
-                  without extension (e.g. "logp_all").
+            name: Dataset name (e.g. "comp_chem/logp/logp_all").
 
         Returns:
             dict with description, column info, references, etc., or None if not found.
@@ -152,7 +143,7 @@ class PublicData:
 
     def _load_descriptions(self) -> dict:
         """Load descriptions.json from S3."""
-        s3_key = f"{self.PREFIX}descriptions.json"
+        s3_key = "descriptions.json"
         try:
             resp = self.s3_client.get_object(Bucket=self.BUCKET, Key=s3_key)
             return json.loads(resp["Body"].read().decode("utf-8"))

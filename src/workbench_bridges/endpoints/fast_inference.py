@@ -7,8 +7,14 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 
 import boto3
+from botocore.config import Config
 
 log = logging.getLogger("workbench-bridges")
+
+# SageMaker enforces a 60s server-side limit per invocation. read_timeout=90s
+# gives headroom for network jitter on top of that so the client always receives
+# the server's response (success or error) before giving up.
+_SM_CLIENT_CONFIG = Config(connect_timeout=10, read_timeout=90)
 
 _CACHED_SM_CLIENT = None
 _CACHED_REGION = None
@@ -32,7 +38,9 @@ def get_or_create_sm_client():
     if _CACHED_SM_CLIENT is None:
         _CACHED_REGION = get_aws_region()
         print(f"Creating new SageMaker Runtime client in region: {_CACHED_REGION}")
-        _CACHED_SM_CLIENT = boto3.Session(region_name=_CACHED_REGION).client("sagemaker-runtime")
+        _CACHED_SM_CLIENT = boto3.Session(region_name=_CACHED_REGION).client(
+            "sagemaker-runtime", config=_SM_CLIENT_CONFIG
+        )
     return _CACHED_SM_CLIENT
 
 
@@ -52,7 +60,7 @@ def fast_inference(endpoint_name: str, eval_df: pd.DataFrame, sm_session=None, t
     if sm_session is not None:
         # Support both plain boto3.Session and legacy SageMaker Session objects
         boto_session = getattr(sm_session, "boto_session", sm_session)
-        sm_runtime = boto_session.client("sagemaker-runtime")
+        sm_runtime = boto_session.client("sagemaker-runtime", config=_SM_CLIENT_CONFIG)
     else:
         sm_runtime = get_or_create_sm_client()
 

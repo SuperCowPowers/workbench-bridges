@@ -7,7 +7,7 @@ import awswrangler as wr
 
 # Workbench-Bridges Imports
 from workbench_bridges.aws.sagemaker_session import get_boto3_session
-from workbench_bridges.api.parameter_store import ParameterStore
+from workbench_bridges.core.parameter_store_core import ParameterStoreCore as ParameterStore
 
 log = logging.getLogger("workbench-bridges")
 

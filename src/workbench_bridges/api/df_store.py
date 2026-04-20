@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Union
 import logging
+import uuid
 import awswrangler as wr
 import pandas as pd
 import os
@@ -208,6 +209,42 @@ class DFStore:
             self.log.info(f"Dataframe cached {s3_uri}...")
         except Exception as e:
             self.log.error(f"Failed to cache dataframe '{s3_uri}': {e}")
+            raise
+
+    def append(self, location: str, data: Union[pd.DataFrame, pd.Series]):
+        """Append a DataFrame as a new unique-named parquet file under the location.
+
+        Unlike :meth:`upsert`, this does not delete existing files, so it is
+        safe for concurrent writers: each caller lands its own file under the
+        dataset prefix. Readers (``get``) transparently read all files as
+        one dataset. Schemas across files must be compatible — callers that
+        produce drifting dtypes are responsible for normalizing before append.
+
+        Args:
+            location (str): The location of the data.
+            data (Union[pd.DataFrame, pd.Series]): The data to be appended.
+        """
+        if isinstance(data, pd.Series):
+            data = data.to_frame()
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError("Only Pandas DataFrame or Series objects are supported.")
+
+        data = self.type_convert_before_parquet(data)
+
+        s3_uri = self._generate_s3_uri(location)
+        part_prefix = f"part-{uuid.uuid4().hex}-"
+        try:
+            wr.s3.to_parquet(
+                df=data,
+                path=s3_uri,
+                dataset=True,
+                mode="append",
+                filename_prefix=part_prefix,
+                index=True,
+            )
+            self.log.info(f"Dataframe appended to {s3_uri} ({part_prefix})...")
+        except Exception as e:
+            self.log.error(f"Failed to append dataframe '{s3_uri}': {e}")
             raise
 
     @staticmethod

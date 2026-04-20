@@ -21,6 +21,7 @@ def not_found_returns_none(func: Optional[Callable] = None, *, resource_name: st
         "EntityNotFoundException",
         "ValidationException",
         "NoSuchBucket",
+        "NoSuchKey",
     }
 
     def decorator(inner_func: Callable) -> Callable:

@@ -1,11 +1,12 @@
 """ParameterStoreCore: Implementation for AWS Systems Manager Parameter Store."""
 
-from typing import Union
+from typing import Optional, Union
 import logging
 import json
 import zlib
 import time
 import base64
+from datetime import datetime
 from botocore.exceptions import ClientError
 
 # Workbench-Bridges Imports
@@ -206,6 +207,33 @@ class ParameterStoreCore:
         doc_link = "https://supercowpowers.github.io/workbench/api_classes/df_store"
         self.log.error(f"Compressed size {size} bytes, cannot store > 4KB")
         self.log.error(f"For larger data use the DFStore() class ({doc_link})")
+
+    def last_modified(self, name: str) -> Optional[datetime]:
+        """Return the LastModifiedDate of a parameter, or None if missing / unavailable.
+
+        Useful for staleness checks against upstream resources that have their own
+        modified-at timestamps (e.g. comparing a cached feature list's age to the
+        endpoint it describes).
+
+        Args:
+            name: Parameter name (e.g. ``/workbench/feature_lists/smiles-to-2d-v1``).
+
+        Returns:
+            datetime (UTC, tz-aware) when the parameter was last written, or None
+            if the parameter doesn't exist or the metadata call fails.
+        """
+        try:
+            resp = self.ssm_client.describe_parameters(
+                Filters=[{"Key": "Name", "Values": [name]}],
+                MaxResults=1,
+            )
+            params = resp.get("Parameters", [])
+            return params[0].get("LastModifiedDate") if params else None
+        except Exception:
+            # Staleness checks are an optimization — fail open and let the caller
+            # fall back to trusting the cached value rather than hard-failing here.
+            self.log.exception(f"Failed to read LastModifiedDate for parameter {name!r}")
+            return None
 
     def delete(self, name: str):
         """Delete a parameter from the AWS Parameter Store.

@@ -104,14 +104,17 @@ def async_inference(
     ]
     total = len(chunks)
     actual_in_flight = min(total, max_in_flight)
+    sm_client = boto_session.client("sagemaker")
 
     log.info(
         f"async_inference: endpoint={endpoint_name}, rows={len(eval_df)}, "
-        f"batch_size={batch_size}, chunks={total}, in_flight={actual_in_flight}"
+        f"batch_size={batch_size}, chunks={total}, in_flight={actual_in_flight}, "
+        f"instances={_instance_count_str(sm_client, endpoint_name)}"
     )
 
     results: dict[int, pd.DataFrame] = {}
     failed_indices: list[int] = []
+    completed = 0
 
     with ThreadPoolExecutor(max_workers=actual_in_flight) as pool:
         futures = {
@@ -133,13 +136,20 @@ def async_inference(
             except Exception as e:
                 log.error(f"Chunk {idx} raised unexpectedly: {e}")
                 failed_indices.append(idx)
-                continue
+                result_df = None
+            else:
+                if result_df is None or result_df.empty:
+                    failed_indices.append(idx)
+                else:
+                    results[idx] = result_df
 
-            if result_df is None or result_df.empty:
-                failed_indices.append(idx)
-                continue
-
-            results[idx] = result_df
+            completed += 1
+            if completed % 25 == 0 or completed == total:
+                log.info(
+                    f"Async progress: {completed}/{total} chunks complete "
+                    f"({len(failed_indices)} failed, "
+                    f"instances={_instance_count_str(sm_client, endpoint_name)})"
+                )
 
     if not results:
         raise RuntimeError(f"All {total} async invocations failed for endpoint '{endpoint_name}'")
@@ -152,6 +162,19 @@ def async_inference(
     ordered = [results[i] for i in sorted(results)]
     combined_df = pd.concat(ordered, ignore_index=True)
     return df_type_conversions(combined_df)
+
+
+def _instance_count_str(sm_client, endpoint_name: str) -> str:
+    """Format current instance count, showing ``current→desired`` while scaling.
+
+    Returns ``"?"`` if the describe_endpoint call fails (e.g., missing IAM permission).
+    """
+    try:
+        variant = sm_client.describe_endpoint(EndpointName=endpoint_name)["ProductionVariants"][0]
+        current, desired = variant["CurrentInstanceCount"], variant["DesiredInstanceCount"]
+        return str(current) if current == desired else f"{current}→{desired}"
+    except Exception:
+        return "?"
 
 
 def _resolve_boto_session(sm_session) -> boto3.Session:

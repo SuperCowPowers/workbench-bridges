@@ -168,8 +168,7 @@ def _resolve_boto_session(sm_session) -> boto3.Session:
     )
     if not region:
         raise RuntimeError(
-            "async_inference: no AWS region configured. Pass sm_session= or set "
-            "SAGEMAKER_REGION / AWS_REGION."
+            "async_inference: no AWS region configured. Pass sm_session= or set " "SAGEMAKER_REGION / AWS_REGION."
         )
     return boto3.Session(region_name=region)
 

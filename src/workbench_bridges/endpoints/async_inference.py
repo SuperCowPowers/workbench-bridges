@@ -23,7 +23,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import StringIO
-from typing import Optional
+from typing import Callable, Optional
 
 import boto3
 import pandas as pd
@@ -52,6 +52,7 @@ def async_inference(
     max_in_flight: int = 64,
     s3_bucket: Optional[str] = None,
     s3_input_prefix: Optional[str] = None,
+    instances_str_fn: Optional[Callable[[], str]] = None,
 ) -> pd.DataFrame:
     """Run async inference on a SageMaker endpoint and return a DataFrame.
 
@@ -74,6 +75,13 @@ def async_inference(
             be readable by the endpoint's execution role.
         s3_input_prefix: S3 key prefix for staged inputs (defaults to
             ``endpoints/<endpoint_name>/async-input``).
+        instances_str_fn: Optional callable returning the string for the
+            ``instances=`` log field. Called once at startup and once per
+            progress log. When ``None`` (default), the field shows
+            ``endpoint_name``'s own current count via :func:`instance_count_str`.
+            An empty string suppresses the field. Useful for callers whose
+            endpoint count carries no useful signal (e.g. orchestrators
+            locked to a single instance).
 
     Returns:
         DataFrame containing the endpoint's response, with rows in input
@@ -106,11 +114,20 @@ def async_inference(
     actual_in_flight = min(total, max_in_flight)
     sm_client = boto_session.client("sagemaker")
 
-    log.info(
-        f"async_inference: endpoint={endpoint_name}, rows={len(eval_df)}, "
-        f"batch_size={batch_size}, chunks={total}, in_flight={actual_in_flight}, "
-        f"instances={_instance_count_str(sm_client, endpoint_name)}"
-    )
+    def _label() -> str:
+        return instances_str_fn() if instances_str_fn is not None else instance_count_str(sm_client, endpoint_name)
+
+    instances_label = _label()
+    fields = [
+        f"endpoint={endpoint_name}",
+        f"rows={len(eval_df)}",
+        f"batch_size={batch_size}",
+        f"chunks={total}",
+        f"in_flight={actual_in_flight}",
+    ]
+    if instances_label:
+        fields.append(f"instances={instances_label}")
+    log.info("async_inference: " + ", ".join(fields))
 
     results: dict[int, pd.DataFrame] = {}
     failed_indices: list[int] = []
@@ -145,11 +162,15 @@ def async_inference(
 
             completed += 1
             if completed % 25 == 0 or completed == total:
-                log.info(
+                progress_instances = _label()
+                progress_msg = (
                     f"Async progress: {completed}/{total} chunks complete "
-                    f"({len(failed_indices)} failed, "
-                    f"instances={_instance_count_str(sm_client, endpoint_name)})"
+                    f"({len(failed_indices)} failed"
                 )
+                if progress_instances:
+                    progress_msg += f", instances={progress_instances}"
+                progress_msg += ")"
+                log.info(progress_msg)
 
     if not results:
         raise RuntimeError(f"All {total} async invocations failed for endpoint '{endpoint_name}'")
@@ -164,10 +185,11 @@ def async_inference(
     return df_type_conversions(combined_df)
 
 
-def _instance_count_str(sm_client, endpoint_name: str) -> str:
-    """Format current instance count, showing ``current→desired`` while scaling.
+def instance_count_str(sm_client, endpoint_name: str) -> str:
+    """Format an endpoint's current instance count, showing ``current→desired`` while scaling.
 
-    Returns ``"?"`` if the describe_endpoint call fails (e.g., missing IAM permission).
+    Returns ``"?"`` if the ``describe_endpoint`` call fails (e.g., missing
+    IAM permission).
     """
     try:
         variant = sm_client.describe_endpoint(EndpointName=endpoint_name)["ProductionVariants"][0]

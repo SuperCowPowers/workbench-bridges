@@ -163,10 +163,7 @@ def async_inference(
             completed += 1
             if completed % 25 == 0 or completed == total:
                 progress_instances = _label()
-                progress_msg = (
-                    f"Async progress: {completed}/{total} chunks complete "
-                    f"({len(failed_indices)} failed"
-                )
+                progress_msg = f"Async progress: {completed}/{total} chunks complete " f"({len(failed_indices)} failed"
                 if progress_instances:
                     progress_msg += f", instances={progress_instances}"
                 progress_msg += ")"

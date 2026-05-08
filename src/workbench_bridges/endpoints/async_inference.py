@@ -314,6 +314,58 @@ def _poll_s3_output(s3_client, output_location: str) -> str:
     raise TimeoutError(f"Async output not available after {_POLL_DEADLINE_S}s: {output_location}")
 
 
+def purge_async_queue(
+    endpoint_name: str,
+    s3_bucket: str,
+    sm_session=None,
+    s3_input_prefix: Optional[str] = None,
+) -> int:
+    """Cancel all queued async invocations for an endpoint.
+
+    SageMaker async invocations reference an input CSV in S3. Deleting those
+    staged inputs causes any not-yet-pulled invocation to fail fast with
+    ``NoSuchKey`` when SageMaker tries to read it — draining the queue
+    without further compute. In-flight invocations are unaffected (they've
+    already pulled their input).
+
+    Run this only when no live callers are dispatching against the endpoint;
+    otherwise their just-uploaded inputs may be deleted before SageMaker
+    pulls them.
+
+    Args:
+        endpoint_name: Name of the deployed SageMaker async endpoint.
+        s3_bucket: Bucket where async-input CSVs are staged.
+        sm_session: Optional boto3/SageMaker session (see
+            :func:`async_inference`). If None, builds one from the ambient
+            AWS environment.
+        s3_input_prefix: S3 key prefix for staged inputs. Defaults to
+            ``endpoints/<endpoint_name>/async-input`` to match
+            :func:`async_inference`'s upload location.
+
+    Returns:
+        int: Number of staged input objects deleted.
+    """
+    if s3_input_prefix is None:
+        s3_input_prefix = f"endpoints/{endpoint_name}/async-input"
+    prefix = s3_input_prefix.rstrip("/") + "/"
+
+    boto_session = _resolve_boto_session(sm_session)
+    s3_client = boto_session.client("s3")
+
+    deleted = 0
+    paginator = s3_client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=s3_bucket, Prefix=prefix):
+        objs = page.get("Contents") or []
+        if not objs:
+            continue
+        keys = [{"Key": o["Key"]} for o in objs]
+        s3_client.delete_objects(Bucket=s3_bucket, Delete={"Objects": keys, "Quiet": True})
+        deleted += len(keys)
+
+    log.info(f"purge_async_queue: deleted {deleted} staged inputs from s3://{s3_bucket}/{prefix}")
+    return deleted
+
+
 def _cleanup_s3(s3_client, *s3_uris: str) -> None:
     """Best-effort cleanup of S3 objects. Failures are logged, not raised."""
     for uri in s3_uris:
